@@ -139,17 +139,14 @@ ${activeSources.map(s=>`- ${s.name} (${s.platform}, ${s.category})`).join("\n")}
   ]
 }`;
 
-const resp = await fetch("/api/claude", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    apiKey: apiKey,
-    model: "claude-sonnet-4-6",
-    max_tokens: 4096,
-    messages: [{ role: "user", content: prompt }],
-  }),
-});    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
       max_tokens: 4096,
