@@ -44,17 +44,61 @@ const CATEGORY_META = {
 
 /* ─── default sources ─────────────────────────────────────── */
 const DEFAULT_SOURCES = [
-  { id:"tg-mdli",    platform:"telegram", name:"Machine & Deep Learning Israel", category:"ML/DL/AI",     url:"MDLI1",                                              active:true,  members:"15K+",  activity:5 },
-  { id:"fb-mdli",    platform:"facebook", name:"Machine & Deep Learning Israel", category:"ML/DL/AI",     url:"https://www.facebook.com/groups/MDLI1/",             active:false, members:"55K+",  activity:5 },
-  { id:"fb-dai",     platform:"facebook", name:"Data Analytics Israel",          category:"BI/Analytics", url:"https://www.facebook.com/groups/DataAnalyticsIsrael/",active:false, members:"20K+",  activity:5 },
-  { id:"fb-ds",      platform:"facebook", name:"Data Science Israel",            category:"Data Science", url:"https://www.facebook.com/groups/DataScienceIsrael/", active:false, members:"15K+",  activity:4 },
-  { id:"fb-ai",      platform:"facebook", name:"AI ISRAEL",                      category:"AI גנרטיבי",  url:"https://www.facebook.com/groups/aisrael/",           active:false, members:"70K+",  activity:5 },
-  { id:"fb-excel",   platform:"facebook", name:"Excel Pros Israel",              category:"BI/Analytics", url:"https://www.facebook.com/groups/excelprosisrael/",   active:false, members:"30K+",  activity:4 },
-  { id:"li-mdli",    platform:"linkedin", name:"MDLI LinkedIn",                  category:"ML/DL/AI",     url:"machine-deep-learning-israel",                       active:true,  members:"15K",   activity:4 },
-  { id:"li-dh",      platform:"linkedin", name:"DataHack LinkedIn",              category:"Data Science", url:"datahack",                                           active:true,  members:"6K",    activity:3 },
-  { id:"mu-bdi",     platform:"meetup",   name:"Big Data & Data Science Israel", category:"Data Eng",     url:"big-data-israel",                                    active:true,  members:"6.8K",  activity:3 },
-  { id:"mu-dh",      platform:"meetup",   name:"DataHack Meetup",                category:"Data Science", url:"DataHack",                                           active:true,  members:"3.2K",  activity:3 },
-  { id:"mu-ml",      platform:"meetup",   name:"ML & Big Data Hands-On",         category:"ML/DL/AI",     url:"Machine_Learning_and_Big_Data_hands_on",             active:true,  members:"2.9K",  activity:2 },
+  // ── טלגרם ──────────────────────────────────────────────────────
+  { id:"tg-mdli",      platform:"telegram", name:"Machine & Deep Learning Israel (ערוץ)", category:"ML/DL/AI",     url:"MDLI1",           active:true,  members:"15K+", activity:5 },
+  { id:"tg-mdli-grp",  platform:"telegram", name:"Machine & Deep Learning Israel (קבוצה)", category:"ML/DL/AI",   url:"bit.ly/MDLIgroup", active:true,  members:"5K+",  activity:5 },
+
+  // ── פייסבוק ────────────────────────────────────────────────────
+  { id:"fb-mdli",      platform:"facebook", name:"Machine & Deep Learning Israel",  category:"ML/DL/AI",     url:"https://www.facebook.com/groups/MDLI1/",                  active:false, members:"55K+", activity:5 },
+  { id:"fb-dai",       platform:"facebook", name:"Data Analytics Israel",           category:"BI/Analytics", url:"https://www.facebook.com/groups/DataAnalyticsIsrael/",     active:false, members:"20K+", activity:5 },
+  { id:"fb-ds",        platform:"facebook", name:"Data Science Israel",             category:"Data Science", url:"https://www.facebook.com/groups/DataScienceIsrael/",       active:false, members:"15K+", activity:4 },
+  { id:"fb-ai1",       platform:"facebook", name:"AI ISRAEL – כלים ושימושים",       category:"AI גנרטיבי",  url:"https://www.facebook.com/groups/aisrael/",                 active:false, members:"70K+", activity:5 },
+  { id:"fb-ai2",       platform:"facebook", name:"AI ISRAEL – ChatGPT & Midjourney",category:"AI גנרטיבי",  url:"https://www.facebook.com/groups/845334450251048/",         active:false, members:"40K+", activity:4 },
+  { id:"fb-chatgpt1",  platform:"facebook", name:"ChatGPT ישראל הקהילה",            category:"AI גנרטיבי",  url:"https://www.facebook.com/groups/715153780127233/",         active:false, members:"35K+", activity:4 },
+  { id:"fb-chatgpt2",  platform:"facebook", name:"ChatGPT ישראל – קהילה נוספת",    category:"AI גנרטיבי",  url:"https://www.facebook.com/groups/3347199695494901/",        active:false, members:"25K+", activity:3 },
+  { id:"fb-excel",     platform:"facebook", name:"Excel Pros Israel",               category:"BI/Analytics", url:"https://www.facebook.com/groups/excelprosisrael/",         active:false, members:"30K+", activity:4 },
+  { id:"fb-hackit",    platform:"facebook", name:"HACKIT.CO.IL – AI האקינג ופיתוח", category:"ML/DL/AI",    url:"https://www.facebook.com/groups/725144319132970/",         active:false, members:"8K+",  activity:3 },
+  { id:"fb-dana",      platform:"facebook", name:"בינה מלאכותית של דנה ישראלי",    category:"AI גנרטיבי",  url:"https://www.facebook.com/groups/574653557886298/",         active:false, members:"12K+", activity:3 },
+  { id:"fb-gemini",    platform:"facebook", name:"Gemini Israel",                   category:"AI גנרטיבי",  url:"https://www.facebook.com/groups/1266824747259615/",        active:false, members:"5K+",  activity:2 },
+  { id:"fb-sora",      platform:"facebook", name:"Sora Israel – וידאו ואנימציה AI", category:"AI גנרטיבי",  url:"https://www.facebook.com/groups/365817639698470/",         active:false, members:"6K+",  activity:3 },
+  { id:"fb-law",       platform:"facebook", name:"בינה מלאכותית בעולם המשפט",      category:"CDO/מנהלים",  url:"https://www.facebook.com/groups/1087861915591003/",        active:false, members:"4K+",  activity:2 },
+  { id:"fb-coffee",    platform:"facebook", name:"AI Coffee Club Israel",           category:"AI גנרטיבי",  url:"https://www.facebook.com/groups/aicoffeeclub",             active:false, members:"10K+", activity:3 },
+  { id:"fb-mljobs",    platform:"facebook", name:"Machine & Deep Learning Jobs Israel", category:"ML/DL/AI", url:"https://www.facebook.com/groups/ml.jobs.il/",             active:false, members:"12K+", activity:4 },
+
+  // ── לינקדאין ───────────────────────────────────────────────────
+  { id:"li-mdli",      platform:"linkedin", name:"MDLI LinkedIn",                  category:"ML/DL/AI",     url:"machine-deep-learning-israel",  active:true,  members:"15K",  activity:4 },
+  { id:"li-dh",        platform:"linkedin", name:"DataHack LinkedIn",              category:"Data Science", url:"datahack",                      active:true,  members:"6K",   activity:3 },
+  { id:"li-bigdata",   platform:"linkedin", name:"Big Data Israel – LinkedIn Group",category:"Data Eng",    url:"linkedin.com/groups/4293229",   active:false, members:"8K+",  activity:3 },
+  { id:"li-algo",      platform:"linkedin", name:"Israel Algorithms – LinkedIn",   category:"ML/DL/AI",     url:"linkedin.com/groups/5052809",   active:false, members:"3K+",  activity:2 },
+  { id:"li-iict",      platform:"linkedin", name:"הלשכה לטכנולוגיות מידע – Data & AI", category:"CDO/מנהלים", url:"israel-it",                active:false, members:"5K+",  activity:3 },
+
+  // ── Meetup ─────────────────────────────────────────────────────
+  { id:"mu-bdi",       platform:"meetup",   name:"Big Data & Data Science Israel", category:"Data Eng",     url:"big-data-israel",                        active:true,  members:"6.8K", activity:3 },
+  { id:"mu-dh",        platform:"meetup",   name:"DataHack Meetup",               category:"Data Science", url:"DataHack",                               active:true,  members:"3.2K", activity:3 },
+  { id:"mu-ml",        platform:"meetup",   name:"ML & Big Data Hands-On TLV",    category:"ML/DL/AI",     url:"Machine_Learning_and_Big_Data_hands_on", active:true,  members:"2.9K", activity:2 },
+  { id:"mu-tlvai",     platform:"meetup",   name:"Tel Aviv AI/ML/Data Developers", category:"ML/DL/AI",    url:"tel-aviv-ai-tech-talks",                 active:false, members:"3.2K", activity:3 },
+  { id:"mu-dlboot",    platform:"meetup",   name:"Tel Aviv Deep Learning Bootcamp",category:"ML/DL/AI",    url:"Tel-Aviv-Deep-Learning-Bootcamp",         active:false, members:"1.5K", activity:2 },
+  { id:"mu-schoolai",  platform:"meetup",   name:"Tel Aviv School of AI",         category:"ML/DL/AI",     url:"Tel-Aviv-School-of-AI",                  active:false, members:"1.2K", activity:3 },
+  { id:"mu-datadriven",platform:"meetup",   name:"Data Driven AI Tel Aviv",       category:"Data Science", url:"meetup-group-data-driven",               active:false, members:"800+", activity:3 },
+  { id:"mu-ibm",       platform:"meetup",   name:"IBM Big Data Enthusiasts Israel",category:"Data Eng",    url:"topics/big-data-analytics/il",           active:false, members:"3.4K", activity:2 },
+  { id:"mu-meds",      platform:"meetup",   name:"Medical Data Science Israel",   category:"Data Science", url:"find/il--tel-aviv-yafo/machine-learning", active:false, members:"300+", activity:2 },
+  { id:"mu-h2o",       platform:"meetup",   name:"H2O.ai AutoML Israel",          category:"ML/DL/AI",     url:"topics/automatic-machine-learning/il",   active:false, members:"2.5K", activity:1 },
+
+  // ── קהילות ספקים ───────────────────────────────────────────────
+  { id:"vnd-snowflake",platform:"custom",   name:"Snowflake User Group Israel",   category:"Data Eng",     url:"https://usergroups.snowflake.com/israel/",              active:false, members:"1K+",  activity:3 },
+  { id:"vnd-pbi",      platform:"custom",   name:"Power BI User Group Israel",    category:"BI/Analytics", url:"https://www.meetup.com/israel-power-bi-user-group/",    active:false, members:"800+", activity:3 },
+  { id:"vnd-tableau",  platform:"custom",   name:"Tableau Israel User Group",     category:"BI/Analytics", url:"https://usergroups.tableau.com/israel",                active:false, members:"500+", activity:2 },
+  { id:"vnd-databricks",platform:"custom",  name:"Databricks User Group Israel",  category:"Data Eng",     url:"https://www.meetup.com/databricks-israel-user-group/", active:false, members:"600+", activity:2 },
+  { id:"vnd-aws",      platform:"custom",   name:"AWS User Group Israel",         category:"Cloud/Infra",  url:"https://www.meetup.com/AWS-User-Group-Tel-Aviv/",      active:false, members:"3K+",  activity:3 },
+  { id:"vnd-gdg",      platform:"custom",   name:"GDG Tel Aviv – Google Cloud",   category:"Cloud/Infra",  url:"https://gdg.community.dev/gdg-tel-aviv/",              active:false, members:"2.8K", activity:3 },
+
+  // ── קהילות וארגונים ─────────────────────────────────────────────
+  { id:"org-datahack",  platform:"custom",  name:"DataHack – עמותת Data Science", category:"Data Science", url:"https://www.datahack.org.il/",        active:false, members:"5K+",  activity:4 },
+  { id:"org-iict",      platform:"custom",  name:"הלשכה לטכנולוגיות מידע – Data & AI", category:"CDO/מנהלים", url:"https://www.israel-it.org/data-ai", active:false, members:"2K+",  activity:3 },
+  { id:"org-datail",    platform:"custom",  name:"DatA-IL – חדשנות דאטה לציבור", category:"CDO/מנהלים",   url:"https://data-il.org/",                active:false, members:"1.5K", activity:3 },
+  { id:"org-coffee",    platform:"custom",  name:"AI Coffee Club Israel",          category:"AI גנרטיבי",  url:"https://aicoffeeclub.co.il/",         active:false, members:"20K+", activity:4 },
+  { id:"org-ydata",     platform:"custom",  name:"Y-DATA / Nebius Academy Israel", category:"Data Science", url:"https://www.ydata.co.il/",           active:false, members:"1.2K", activity:4 },
+  { id:"org-analytics", platform:"custom",  name:"ווב אנליטיקס ישראל",           category:"BI/Analytics", url:"https://www.analytics.org.il/",       active:false, members:"N/A",  activity:2 },
 ];
 
 /* ─── mock Claude summariser ──────────────────────────────── */
