@@ -506,7 +506,11 @@ const SettingsPanel = ({ cfg, onChange }) => {
 export default function App() {
   const [tab, setTab]         = useState("sources");   // sources | settings | history
   const [sources, setSources] = useState(DEFAULT_SOURCES);
-  const [cfg, setCfg]         = useState({ intervalDays: 2, topicsPerCat: 4 });
+  const [cfg, setCfg]         = useState(() => ({
+    intervalDays: 2,
+    topicsPerCat: 4,
+    claudeKey: typeof window !== "undefined" ? (localStorage.getItem("digest_claude_key") || "") : "",
+  }));
   const [modal, setModal]     = useState(null);        // null | "add" | source_obj
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState("");
@@ -515,6 +519,10 @@ export default function App() {
   const [filterPlatform, setFilterPlatform] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
   const [toast, setToast]     = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem("digest_claude_key", cfg.claudeKey || "");
+  }, [cfg.claudeKey]);
 
   const showToast = (msg, type = "ok") => {
     setToast({ msg, type });
