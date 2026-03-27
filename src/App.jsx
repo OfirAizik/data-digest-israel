@@ -154,11 +154,14 @@ ${activeSources.map(s=>`- ${s.name} (${s.platform}, ${s.category})`).join("\n")}
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+    const msg = err?.error?.message || err?.message || `HTTP ${resp.status}`;
+    throw new Error(msg.replace(/sk-ant-[^\s"']*/g, "[REDACTED]"));
   }
 
   const data = await resp.json();
-  const raw = data.content[0].text.replace(/```json\n?|```/g, "").trim();
+  const text = data?.content?.[0]?.text;
+  if (!text) throw new Error("תגובה לא תקינה מ-Claude API");
+  const raw = text.replace(/```json\n?|```/g, "").trim();
   return JSON.parse(raw);
 }
 
