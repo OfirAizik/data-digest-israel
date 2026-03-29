@@ -118,6 +118,8 @@ async function callClaude(apiKey, sources, days) {
 ${activeSources.map(s=>`- ${s.name} (${s.platform}, ${s.category})`).join("\n")}
 
 צור דוח JSON עם הנושאים החמים ביותר לכל קטגוריה.
+לכל נושא חשב ציון על בסיס: תגובות (35%), משתתפים ייחודיים (25%), עומק דיון (20%), חידוש הנושא (20%).
+ציון: "גבוה" אם מעל 70, "בינוני" אם 40-70, "נמוך" אם מתחת ל-40.
 החזר JSON בלבד:
 {
   "generated_at": "ISO_DATE",
@@ -130,7 +132,12 @@ ${activeSources.map(s=>`- ${s.name} (${s.platform}, ${s.category})`).join("\n")}
       "topics": [
         {
           "title": "כותרת הנושא בעברית",
-          "description": "תיאור קצר 2-3 משפטים",
+          "shortDescription": "תיאור קצר 1-2 משפטים",
+          "longDescription": "תיאור מורחב 3-4 משפטים עם ניתוח מעמיק של הדיון, הסיבות לפופולריות והשלכות על הקהילה",
+          "date": "לפני X ימים",
+          "replies": 47,
+          "participants": 23,
+          "score": "גבוה",
           "interest": "high|medium|low",
           "sources": ["שם מקור 1", "שם מקור 2"],
           "tags": ["tag1","tag2"]
@@ -225,6 +232,13 @@ const InterestDot = ({ level }) => {
   const m = map[level] || map.medium;
   return <span style={{ color: m.c, fontSize: 12, fontWeight: 700 }}>{m.l}</span>;
 };
+
+const MetaBadge = ({ children }) => (
+  <span style={{
+    background: "#ffffff10", color: T.textDim, border: "1px solid #ffffff1a",
+    borderRadius: 5, padding: "2px 7px", fontSize: 11, whiteSpace: "nowrap",
+  }}>{children}</span>
+);
 
 const Spinner = () => (
   <div style={{
@@ -356,7 +370,46 @@ const SourceModal = ({ src, onSave, onClose }) => {
 
 /* ─── Report Viewer ───────────────────────────────────────── */
 const ReportViewer = ({ report, onClose }) => {
+  const [expandedIds, setExpandedIds] = useState(new Set());
   if (!report) return null;
+
+  const toggleExpand = (id) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const exportCSV = () => {
+    const BOM = "\uFEFF";
+    const header = "קטגוריה,נושא,תיאור,תאריך,תגובות,משתתפים,ציון,תגיות";
+    const rows = [];
+    (report.categories || []).forEach(cat => {
+      (cat.topics || []).forEach(t => {
+        const cols = [
+          cat.name,
+          t.title,
+          t.shortDescription || t.description || "",
+          t.date || "",
+          t.replies ?? "",
+          t.participants ?? "",
+          t.score || "",
+          (t.tags || []).join("|"),
+        ].map(v => `"${String(v).replace(/"/g, '""')}"`);
+        rows.push(cols.join(","));
+      });
+    });
+    const csv = BOM + header + "\n" + rows.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `data-digest-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div style={{
       position: "fixed", inset: 0, background: "rgba(0,0,0,.85)",
@@ -364,6 +417,18 @@ const ReportViewer = ({ report, onClose }) => {
       padding: "32px 16px", direction: "rtl",
     }}>
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
+        {/* AI Disclaimer */}
+        <div style={{
+          background: "#78350f33", border: "1px solid #f59e0b66",
+          borderRadius: 10, padding: "10px 16px", marginBottom: 20,
+          display: "flex", alignItems: "flex-start", gap: 8,
+        }}>
+          <span style={{ fontSize: 15, flexShrink: 0 }}>⚠️</span>
+          <span style={{ color: "#fcd34d", fontSize: 12, lineHeight: 1.5 }}>
+            ניתוח זה נוצר על ידי Claude AI ואינו מבוסס על סריקה אמיתית של הפלטפורמות. הנתונים הם הערכה בינה מלאכותית בלבד.
+          </span>
+        </div>
+
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <div>
             <h2 style={{ color: T.text, margin: 0, fontSize: 22, fontWeight: 800 }}>📊 דוח Data Digest</h2>
@@ -371,12 +436,21 @@ const ReportViewer = ({ report, onClose }) => {
               נוצר: {new Date(report.generated_at).toLocaleString("he-IL")} | {report.sources_scanned} מקורות | {report.days_scanned} ימים
             </p>
           </div>
-          <button onClick={onClose} style={{
-            background: T.card, border: `1px solid ${T.border}`, color: T.textDim,
-            borderRadius: 10, padding: "8px 16px", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6,
-          }}>
-            <Icon name="x" size={14}/> סגור
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={exportCSV} style={{
+              background: T.card, border: `1px solid ${T.border}`, color: T.textDim,
+              borderRadius: 10, padding: "8px 16px", cursor: "pointer", fontSize: 13,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              📥 ייצא CSV
+            </button>
+            <button onClick={onClose} style={{
+              background: T.card, border: `1px solid ${T.border}`, color: T.textDim,
+              borderRadius: 10, padding: "8px 16px", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6,
+            }}>
+              <Icon name="x" size={14}/> סגור
+            </button>
+          </div>
         </div>
 
         {(report.categories || []).map((cat, ci) => {
@@ -396,24 +470,50 @@ const ReportViewer = ({ report, onClose }) => {
                 <span style={{ color: T.textDim, fontSize: 12 }}>{cat.posts_scanned} פוסטים נסרקו</span>
               </div>
               <div style={{ padding: "16px 20px" }}>
-                {(cat.topics || []).map((t, ti) => (
-                  <div key={ti} style={{
-                    borderRight: `3px solid ${meta.color}`,
-                    paddingRight: 14, marginBottom: 16,
-                    background: meta.color + "08", borderRadius: "0 8px 8px 0",
-                    padding: "10px 14px",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
-                      <span style={{ color: T.text, fontWeight: 700, fontSize: 14 }}>{t.title}</span>
-                      <InterestDot level={t.interest}/>
+                {(cat.topics || []).map((t, ti) => {
+                  const topicId = `${ci}-${ti}`;
+                  const isExpanded = expandedIds.has(topicId);
+                  return (
+                    <div key={ti} style={{
+                      borderRight: `3px solid ${meta.color}`,
+                      background: meta.color + "08", borderRadius: "0 8px 8px 0",
+                      padding: "10px 14px", marginBottom: 16,
+                    }}>
+                      <div onClick={() => toggleExpand(topicId)} style={{ cursor: "pointer" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4, flexWrap: "wrap", gap: 6 }}>
+                          <span style={{ color: T.text, fontWeight: 700, fontSize: 14 }}>{t.title}</span>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <InterestDot level={t.interest}/>
+                            <span style={{ color: T.textFaint, fontSize: 11, userSelect: "none" }}>
+                              {isExpanded ? "▲ צמצם" : "▼ הרחב"}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+                          {t.date && <MetaBadge>📅 {t.date}</MetaBadge>}
+                          {t.replies != null && <MetaBadge>💬 {t.replies} תגובות</MetaBadge>}
+                          {t.participants != null && <MetaBadge>👥 {t.participants} משתתפים</MetaBadge>}
+                        </div>
+                      </div>
+                      <p style={{ color: T.textDim, fontSize: 13, margin: "0 0 8px", lineHeight: 1.6 }}>
+                        {t.shortDescription || t.description}
+                      </p>
+                      {isExpanded && t.longDescription && (
+                        <p style={{
+                          color: T.text, fontSize: 13, margin: "0 0 8px", lineHeight: 1.7,
+                          background: meta.color + "11", borderRadius: 6, padding: "8px 12px",
+                          borderRight: `2px solid ${meta.color}66`,
+                        }}>
+                          {t.longDescription}
+                        </p>
+                      )}
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {(t.tags || []).map(tag => <Badge key={tag} color={meta.color}>#{tag}</Badge>)}
+                        {(t.sources || []).map(s => <span key={s} style={{ color: T.textFaint, fontSize: 11 }}>📍 {s}</span>)}
+                      </div>
                     </div>
-                    <p style={{ color: T.textDim, fontSize: 13, margin: "0 0 8px", lineHeight: 1.6 }}>{t.description}</p>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {(t.tags || []).map(tag => <Badge key={tag} color={meta.color}>#{tag}</Badge>)}
-                      {(t.sources || []).map(s => <span key={s} style={{ color: T.textFaint, fontSize: 11 }}>📍 {s}</span>)}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {cat.trend && (
                   <div style={{
                     background: T.card, border: `1px solid ${T.border}`,
