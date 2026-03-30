@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { supabase } from "../lib/supabase";
+import LoginScreen from "./components/LoginScreen";
+import LogsScreen from "./components/LogsScreen";
+import UsersScreen from "./components/UsersScreen";
 
 /* ─── palette & tokens ────────────────────────────────────── */
 const T = {
@@ -120,6 +124,8 @@ ${activeSources.map(s=>`- ${s.name} (${s.platform}, ${s.category})`).join("\n")}
 צור דוח JSON עם הנושאים החמים ביותר לכל קטגוריה.
 לכל נושא חשב ציון על בסיס: תגובות (35%), משתתפים ייחודיים (25%), עומק דיון (20%), חידוש הנושא (20%).
 ציון: "גבוה" אם מעל 70, "בינוני" אם 40-70, "נמוך" אם מתחת ל-40.
+חשוב מאוד: החזר JSON תקין ומלא בלבד - ללא טקסט לפני או אחרי. וודא שה-JSON נסגר כראוי עם כל הסוגריים.
+שמור shortDescription ו-longDescription קצרים (עד 200 תווים כל אחד) כדי להימנע מחריגת אסימונים.
 החזר JSON בלבד:
 {
   "generated_at": "ISO_DATE",
@@ -154,7 +160,7 @@ ${activeSources.map(s=>`- ${s.name} (${s.platform}, ${s.category})`).join("\n")}
     body: JSON.stringify({
       apiKey,
       model: "claude-sonnet-4-6",
-      max_tokens: 4096,
+      max_tokens: 8000,
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -169,7 +175,20 @@ ${activeSources.map(s=>`- ${s.name} (${s.platform}, ${s.category})`).join("\n")}
   const text = data?.content?.[0]?.text;
   if (!text) throw new Error("תגובה לא תקינה מ-Claude API");
   const raw = text.replace(/```json\n?|```/g, "").trim();
-  return JSON.parse(raw);
+  const usage = data.usage || {};
+  try {
+    return { result: JSON.parse(raw), usage };
+  } catch (parseErr) {
+    // Try to salvage partial JSON by finding the last complete category object
+    const lastBrace = raw.lastIndexOf('"}');
+    if (lastBrace !== -1) {
+      const candidates = [raw.slice(0, lastBrace + 2) + "]}]}"];
+      for (const attempt of candidates) {
+        try { return { result: JSON.parse(attempt), usage }; } catch {}
+      }
+    }
+    throw new Error(`תגובת Claude לא הושלמה (JSON חלקי). נסה שנית עם פחות מקורות פעילים. פרטים: ${parseErr.message}`);
+  }
 }
 
 /* ─── icons ──────────────────────────────────────────────── */
@@ -621,7 +640,28 @@ export default function App() {
   const [history, setHistory] = useState([]);
   const [filterPlatform, setFilterPlatform] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
-  const [toast, setToast]     = useState(null);
+  const [toast, setToast]       = useState(null);
+  const [user, setUser]           = useState(null);
+  const [userPerms, setUserPerms] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  const fetchUserPerms = useCallback(async (userId) => {
+    const { data } = await supabase.from("user_permissions").select("*").eq("user_id", userId).single();
+    setUserPerms(data || null);
+    setAuthLoading(false);
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) { setUser(session.user); fetchUserPerms(session.user.id); }
+      else setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) { setUser(session.user); fetchUserPerms(session.user.id); }
+      else { setUser(null); setUserPerms(null); setAuthLoading(false); }
+    });
+    return () => subscription.unsubscribe();
+  }, [fetchUserPerms]);
 
   useEffect(() => {
     localStorage.setItem("digest_claude_key", cfg.claudeKey || "");
@@ -665,6 +705,17 @@ export default function App() {
     if (!cfg.claudeKey) { showToast("❌ הכנס Claude API Key בהגדרות", "error"); setTab("settings"); return; }
     if (activeSources.length === 0) { showToast("❌ אין מקורות פעילים", "error"); return; }
 
+    // Check daily run limit
+    if (userPerms) {
+      const today = new Date().toISOString().slice(0, 10);
+      const runsToday = userPerms.last_run_date === today ? (userPerms.runs_today || 0) : 0;
+      if (runsToday >= (userPerms.daily_run_limit ?? 3)) {
+        showToast(`❌ הגעת למגבלת ${userPerms.daily_run_limit} ריצות היום`, "error");
+        return;
+      }
+    }
+
+    const startedAt = new Date().toISOString();
     setRunning(true);
     setProgress("מאתחל סריקה...");
 
@@ -673,13 +724,41 @@ export default function App() {
       await new Promise(r => setTimeout(r, 800));
 
       setProgress("שולח ל-Claude API לסיכום...");
-      const result = await callClaude(cfg.claudeKey, sources, cfg.intervalDays || 2);
+      const { result, usage } = await callClaude(cfg.claudeKey, sources, cfg.intervalDays || 2);
 
       setReport(result);
       setHistory(prev => [{ ...result, id: Date.now() }, ...prev.slice(0, 9)]);
       showToast("✅ דוח נוצר בהצלחה!", "ok");
+
+      // Log to Supabase
+      if (user) {
+        const inputTokens  = usage.input_tokens  || 0;
+        const outputTokens = usage.output_tokens || 0;
+        const costUsd      = inputTokens * 0.000003 + outputTokens * 0.000015;
+        await supabase.from("run_logs").insert({
+          user_id: user.id, user_email: user.email,
+          started_at: startedAt, finished_at: new Date().toISOString(),
+          status: "success", sources_scanned: activeSources.length,
+          input_tokens: inputTokens, output_tokens: outputTokens,
+          total_tokens: inputTokens + outputTokens, cost_usd: costUsd,
+          report_summary: `${(result.categories || []).length} קטגוריות`,
+        });
+        // Update runs_today counter
+        const today = new Date().toISOString().slice(0, 10);
+        const runsToday = userPerms?.last_run_date === today ? (userPerms.runs_today || 0) : 0;
+        await supabase.from("user_permissions").update({ runs_today: runsToday + 1, last_run_date: today }).eq("user_id", user.id);
+        setUserPerms(prev => prev ? { ...prev, runs_today: runsToday + 1, last_run_date: today } : prev);
+      }
     } catch (e) {
       showToast(`❌ שגיאה: ${e.message}`, "error");
+      if (user) {
+        await supabase.from("run_logs").insert({
+          user_id: user.id, user_email: user.email,
+          started_at: startedAt, finished_at: new Date().toISOString(),
+          status: "error", sources_scanned: activeSources.length,
+          error_message: e.message,
+        });
+      }
     } finally {
       setRunning(false);
       setProgress("");
@@ -693,6 +772,22 @@ export default function App() {
     { label: "פלטפורמות",    value: platforms.length,      color: T.gold,     icon: "settings" },
     { label: "דוחות שנוצרו", value: history.length,        color: T.orange,   icon: "report"  },
   ];
+
+  if (authLoading) return (
+    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", color: T.textDim, fontFamily: "'Segoe UI', Tahoma, Arial, sans-serif" }}>
+      טוען...
+    </div>
+  );
+
+  if (!user) return <LoginScreen onLogin={(u) => { setUser(u); fetchUserPerms(u.id); }} />;
+
+  const navItems = [
+    { id: "sources",  label: "מקורות",   icon: "db",       show: userPerms?.can_access_sources  !== false },
+    { id: "settings", label: "הגדרות",   icon: "settings", show: userPerms?.can_access_settings !== false },
+    { id: "history",  label: "היסטוריה", icon: "report",   show: userPerms?.can_access_history  !== false },
+    { id: "logs",     label: "לוגים",    icon: "report",   show: !!userPerms?.can_access_logs   },
+    { id: "users",    label: "משתמשים",  icon: "toggle",   show: userPerms?.role === "admin"    },
+  ].filter(item => item.show);
 
   return (
     <div style={{
@@ -747,11 +842,7 @@ export default function App() {
 
         {/* Nav */}
         <nav style={{ padding: "12px 10px", flex: 1 }}>
-          {[
-            { id: "sources",  label: "מקורות",   icon: "db"       },
-            { id: "settings", label: "הגדרות",   icon: "settings" },
-            { id: "history",  label: "היסטוריה", icon: "report"   },
-          ].map(item => (
+          {navItems.map(item => (
             <button key={item.id} onClick={() => setTab(item.id)} style={{
               width: "100%", display: "flex", alignItems: "center", gap: 10,
               background: tab === item.id ? T.accent + "22" : "none",
@@ -766,6 +857,26 @@ export default function App() {
             </button>
           ))}
         </nav>
+
+        {/* User info + logout */}
+        <div style={{ padding: "12px 14px", borderTop: `1px solid ${T.border}` }}>
+          <div style={{ color: T.textFaint, fontSize: 11, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {user.email}
+          </div>
+          {userPerms?.role === "admin" && (
+            <div style={{ color: T.gold, fontSize: 10, marginBottom: 8 }}>👑 מנהל</div>
+          )}
+          <button
+            onClick={async () => { await supabase.auth.signOut(); }}
+            style={{
+              width: "100%", background: "none", border: `1px solid ${T.border}`,
+              color: T.textDim, borderRadius: 8, padding: "7px 0",
+              cursor: "pointer", fontSize: 12,
+            }}
+          >
+            יציאה
+          </button>
+        </div>
 
         {/* Run button */}
         <div style={{ padding: "16px 12px", borderTop: `1px solid ${T.border}` }}>
@@ -991,6 +1102,12 @@ export default function App() {
             </button>
           </div>
         )}
+
+        {/* ── LOGS TAB ─────────────────────────────────────── */}
+        {tab === "logs" && <LogsScreen />}
+
+        {/* ── USERS TAB ────────────────────────────────────── */}
+        {tab === "users" && <UsersScreen />}
 
         {/* ── HISTORY TAB ──────────────────────────────────── */}
         {tab === "history" && (
