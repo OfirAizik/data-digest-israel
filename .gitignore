@@ -1,6 +1,29 @@
+# Dependencies
 node_modules
 dist
+.next
+
+# Environment variables
 .env
 .env.local
+.env.development
+.env.production
+
+# OS files
 .DS_Store
-.next 
+Thumbs.db
+
+# Telegram - קריטי לאבטחה
+*.session
+*.session-journal
+test_telegram.py
+test_scan.py
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Secrets
+secrets.py
+config_local.py
