@@ -18,29 +18,144 @@ const T = {
 };
 
 const TREND = {
-  "עולה":  { color: T.green,   bg: T.green  + "22", label: "↑ עולה"  },
-  "יורד":  { color: T.red,     bg: T.red    + "22", label: "↓ יורד"  },
-  "יציב":  { color: T.muted,   bg: T.muted  + "22", label: "→ יציב"  },
+  "עולה": { color: T.green, bg: T.green + "22", label: "↑ עולה" },
+  "יורד": { color: T.red,   bg: T.red   + "22", label: "↓ יורד" },
+  "יציב": { color: T.muted, bg: T.muted + "22", label: "→ יציב" },
 };
 
 function TrendBadge({ trend }) {
   const t = TREND[trend] || { color: T.muted, bg: T.muted + "22", label: trend || "—" };
   return (
     <span style={{
-      background: t.bg, color: t.color,
-      border: `1px solid ${t.color}44`,
-      borderRadius: 6, padding: "2px 8px",
-      fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
+      background: t.bg, color: t.color, border: `1px solid ${t.color}44`,
+      borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
     }}>
       {t.label}
     </span>
   );
 }
 
+// Chevron that rotates when open
+function Chevron({ open }) {
+  return (
+    <svg
+      width={14} height={14} viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="2.5"
+      style={{
+        flexShrink: 0, color: T.textFaint,
+        transform: open ? "rotate(180deg)" : "rotate(0deg)",
+        transition: "transform .2s",
+      }}
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+function TopicRow({ topic, index }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{
+      borderBottom: `1px solid ${T.border}`,
+    }}>
+      {/* Topic header — always visible */}
+      <div
+        onClick={() => setOpen(v => !v)}
+        style={{
+          padding: "12px 20px", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 10,
+          background: open ? T.card + "80" : "transparent",
+          transition: "background .15s",
+        }}
+      >
+        {/* Number bubble */}
+        <span style={{
+          background: T.accent + "33", color: T.accentHi,
+          borderRadius: "50%", width: 22, height: 22, flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 11, fontWeight: 800,
+        }}>
+          {index + 1}
+        </span>
+
+        {/* Title + trend */}
+        <span style={{ color: T.text, fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0 }}>
+          {topic.title}
+        </span>
+        <TrendBadge trend={topic.trend} />
+        <Chevron open={open} />
+      </div>
+
+      {/* Expanded topic details */}
+      {open && (
+        <div style={{ padding: "12px 20px 16px 52px", background: T.card + "40" }}>
+          {/* Summary */}
+          {topic.summary && (
+            <p style={{ color: T.textDim, fontSize: 13, lineHeight: 1.65, marginBottom: 12 }}>
+              {topic.summary}
+            </p>
+          )}
+
+          {/* Stats row */}
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: topic.top_post_url ? 12 : 0 }}>
+            {topic.posts_count != null && (
+              <div>
+                <div style={{ color: T.textFaint, fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", marginBottom: 2 }}>
+                  פוסטים בנושא
+                </div>
+                <div style={{ color: T.text, fontSize: 14, fontWeight: 700 }}>{topic.posts_count}</div>
+              </div>
+            )}
+            {topic.weekly_posts_count != null && (
+              <div>
+                <div style={{ color: T.textFaint, fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", marginBottom: 2 }}>
+                  השבוע
+                </div>
+                <div style={{ color: T.green, fontSize: 14, fontWeight: 700 }}>{topic.weekly_posts_count}</div>
+              </div>
+            )}
+            {topic.avg_views != null && (
+              <div>
+                <div style={{ color: T.textFaint, fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", marginBottom: 2 }}>
+                  ממוצע צפיות
+                </div>
+                <div style={{ color: T.gold, fontSize: 14, fontWeight: 700 }}>
+                  {Number(topic.avg_views).toLocaleString("he-IL")}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Top post link */}
+          {topic.top_post_url && (
+            <a
+              href={topic.top_post_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                color: T.accentHi, fontSize: 12, fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              פתח פוסט מוביל
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReportCard({ report }) {
   const [open, setOpen] = useState(false);
 
-  // topics may come back as a parsed array (JSONB) or as a JSON string
   let topics = report.topics;
   if (typeof topics === "string") {
     try { topics = JSON.parse(topics); } catch { topics = []; }
@@ -60,16 +175,17 @@ function ReportCard({ report }) {
       background: T.panel, border: `1px solid ${T.border}`,
       borderRadius: 14, overflow: "hidden", marginBottom: 14,
     }}>
-      {/* Card header */}
+      {/* Collapsed header */}
       <div
         onClick={() => setOpen(v => !v)}
         style={{
           padding: "16px 20px", cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: 12,
+          gap: 12, background: open ? T.card + "50" : "transparent",
+          transition: "background .15s",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           {/* Date */}
           <div>
             <div style={{ color: T.text, fontSize: 14, fontWeight: 700 }}>{dateLabel}</div>
@@ -87,74 +203,38 @@ function ReportCard({ report }) {
             📡 {report.source || "—"}
           </span>
 
-          {/* Total posts */}
-          <span style={{ color: T.textDim, fontSize: 12 }}>
+          {/* total_posts */}
+          <span style={{
+            background: T.card, border: `1px solid ${T.border}`,
+            borderRadius: 6, padding: "3px 9px", color: T.textDim, fontSize: 12, fontWeight: 600,
+          }}>
             {report.total_posts ?? "—"} פוסטים
           </span>
 
-          {/* Topic count */}
-          <span style={{ color: T.textFaint, fontSize: 12 }}>
+          {/* topics count */}
+          <span style={{
+            background: T.card, border: `1px solid ${T.border}`,
+            borderRadius: 6, padding: "3px 9px", color: T.textFaint, fontSize: 12,
+          }}>
             {topics.length} נושאים
           </span>
         </div>
 
-        {/* Expand arrow */}
-        <div style={{
-          color: T.textFaint, fontSize: 16, flexShrink: 0,
-          transform: open ? "rotate(180deg)" : "rotate(0deg)",
-          transition: "transform .2s",
-        }}>
-          ▾
-        </div>
+        <Chevron open={open} />
       </div>
 
       {/* Topics list */}
       {open && (
         <div style={{ borderTop: `1px solid ${T.border}` }}>
-          {topics.length === 0 && (
-            <div style={{ padding: "20px", color: T.textDim, fontSize: 13, textAlign: "center" }}>
+          {topics.length === 0 ? (
+            <div style={{ padding: 24, textAlign: "center", color: T.textDim, fontSize: 13 }}>
               אין נושאים בדוח זה.
             </div>
+          ) : (
+            topics.map((topic, i) => (
+              <TopicRow key={i} topic={topic} index={i} />
+            ))
           )}
-          {topics.map((topic, i) => (
-            <div key={i} style={{
-              padding: "14px 20px",
-              borderBottom: i < topics.length - 1 ? `1px solid ${T.border}` : "none",
-              background: i % 2 === 0 ? "transparent" : T.card + "60",
-            }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
-                {/* Topic number */}
-                <span style={{
-                  background: T.accent + "33", color: T.accentHi,
-                  borderRadius: "50%", width: 22, height: 22, flexShrink: 0,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 800, marginTop: 1,
-                }}>
-                  {i + 1}
-                </span>
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {/* Title row */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-                    <span style={{ color: T.text, fontSize: 13, fontWeight: 700 }}>{topic.title}</span>
-                    <TrendBadge trend={topic.trend} />
-                    {topic.posts_count != null && (
-                      <span style={{ color: T.textFaint, fontSize: 11 }}>
-                        {topic.posts_count} פוסטים
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Summary */}
-                  {topic.summary && (
-                    <div style={{ color: T.textDim, fontSize: 13, lineHeight: 1.6 }}>
-                      {topic.summary}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       )}
     </div>
@@ -202,7 +282,7 @@ export default function ReportsScreen() {
       {loading && (
         <div style={{
           background: T.panel, border: `1px solid ${T.border}`,
-          borderRadius: 14, padding: 48, textAlign: "center", color: T.textDim,
+          borderRadius: 14, padding: 48, textAlign: "center", color: T.textDim, fontSize: 14,
         }}>
           טוען דוחות...
         </div>
