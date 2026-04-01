@@ -6,6 +6,7 @@ import LoginScreen from "./components/LoginScreen";
 import LogsScreen from "./components/LogsScreen";
 import UsersScreen from "./components/UsersScreen";
 import ChannelsScreen from "./components/ChannelsScreen";
+import ReportsScreen from "./components/ReportsScreen";
 
 /* ─── palette & tokens ────────────────────────────────────── */
 const T = {
@@ -818,6 +819,7 @@ export default function App() {
 
   const navItems = [
     { id: "sources",   label: "מקורות",  icon: "db",        show: userPerms?.can_access_sources  !== false },
+    { id: "reports",   label: "דוחות",   icon: "report",    show: userPerms?.can_access_sources  !== false },
     { id: "channels",  label: "ערוצים",  icon: "broadcast", show: userPerms?.can_access_sources  !== false },
     { id: "settings",  label: "הגדרות",  icon: "settings",  show: userPerms?.can_access_settings !== false },
     { id: "history",  label: "היסטוריה", icon: "report",   show: userPerms?.can_access_history  !== false },
@@ -1183,6 +1185,9 @@ export default function App() {
             </button>
           </div>
         )}
+
+        {/* ── REPORTS TAB ──────────────────────────────────── */}
+        {tab === "reports" && <ReportsScreen />}
 
         {/* ── CHANNELS TAB ─────────────────────────────────── */}
         {tab === "channels" && <ChannelsScreen isAdmin={userPerms?.role === "admin"} />}
