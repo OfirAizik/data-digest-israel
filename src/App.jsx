@@ -146,7 +146,8 @@ ${activeSources.map(s=>`- ${s.name} (${s.platform}, ${s.category})`).join("\n")}
           "score": "גבוה",
           "interest": "high|medium|low",
           "sources": ["שם מקור 1", "שם מקור 2"],
-          "tags": ["tag1","tag2"]
+          "tags": ["tag1","tag2"],
+          "sourceUrl": "https://t.me/MDLI1/12345 or null"
         }
       ],
       "trend": "תובנה מסכמת על הטרנד בקטגוריה"
@@ -498,34 +499,65 @@ const ReportViewer = ({ report, onClose }) => {
                       background: meta.color + "08", borderRadius: "0 8px 8px 0",
                       padding: "10px 14px", marginBottom: 16,
                     }}>
-                      <div onClick={() => toggleExpand(topicId)} style={{ cursor: "pointer" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4, flexWrap: "wrap", gap: 6 }}>
-                          <span style={{ color: T.text, fontWeight: 700, fontSize: 14 }}>{t.title}</span>
-                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <InterestDot level={t.interest}/>
-                            <span style={{ color: T.textFaint, fontSize: 11, userSelect: "none" }}>
-                              {isExpanded ? "▲ צמצם" : "▼ הרחב"}
-                            </span>
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
-                          {t.date && <MetaBadge>📅 {t.date}</MetaBadge>}
-                          {t.replies != null && <MetaBadge>💬 {t.replies} תגובות</MetaBadge>}
-                          {t.participants != null && <MetaBadge>👥 {t.participants} משתתפים</MetaBadge>}
-                        </div>
+                      {/* Title row */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
+                        <span style={{ color: T.text, fontWeight: 700, fontSize: 14 }}>{t.title}</span>
+                        <InterestDot level={t.interest}/>
                       </div>
-                      <p style={{ color: T.textDim, fontSize: 13, margin: "0 0 8px", lineHeight: 1.6 }}>
+                      {/* Meta badges */}
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                        {t.date && <MetaBadge>📅 {t.date}</MetaBadge>}
+                        {t.replies != null && <MetaBadge>💬 {t.replies} תגובות</MetaBadge>}
+                        {t.participants != null && <MetaBadge>👥 {t.participants} משתתפים</MetaBadge>}
+                      </div>
+                      {/* Short description — always visible */}
+                      <p style={{ color: T.textDim, fontSize: 13, margin: "0 0 6px", lineHeight: 1.6 }}>
                         {t.shortDescription || t.description}
                       </p>
-                      {isExpanded && t.longDescription && (
-                        <p style={{
-                          color: T.text, fontSize: 13, margin: "0 0 8px", lineHeight: 1.7,
-                          background: meta.color + "11", borderRadius: 6, padding: "8px 12px",
-                          borderRight: `2px solid ${meta.color}66`,
-                        }}>
-                          {t.longDescription}
-                        </p>
+                      {/* Expandable long description with smooth transition */}
+                      {t.longDescription && (
+                        <>
+                          <div className={`topic-expand-content${isExpanded ? ' expanded' : ''}`}>
+                            <p style={{
+                              color: T.text, fontSize: 13, margin: "0 0 8px", lineHeight: 1.7,
+                              background: meta.color + "11", borderRadius: 6, padding: "8px 12px",
+                              borderRight: `2px solid ${meta.color}66`,
+                            }}>
+                              {t.longDescription}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => toggleExpand(topicId)}
+                            style={{
+                              background: "none", border: "none", cursor: "pointer",
+                              color: T.accentHi, fontSize: 12, fontWeight: 600,
+                              padding: "2px 0", marginBottom: 8,
+                              display: "inline-flex", alignItems: "center", gap: 4,
+                            }}
+                          >
+                            {isExpanded ? "▲ צמצם / Read less" : "▼ הרחב / Read more"}
+                          </button>
+                        </>
                       )}
+                      {/* Source thread link */}
+                      {t.sourceUrl && (
+                        <div style={{ marginBottom: 8 }}>
+                          <a
+                            href={t.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              color: T.textDim, fontSize: 12, textDecoration: "none",
+                              borderBottom: `1px dashed ${T.border}`,
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.color = T.accentHi}
+                            onMouseLeave={e => e.currentTarget.style.color = T.textDim}
+                          >
+                            לשרשור המקורי ←
+                          </a>
+                        </div>
+                      )}
+                      {/* Tags and sources */}
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         {(t.tags || []).map(tag => <Badge key={tag} color={meta.color}>#{tag}</Badge>)}
                         {(t.sources || []).map(s => <span key={s} style={{ color: T.textFaint, fontSize: 11 }}>📍 {s}</span>)}
@@ -641,6 +673,7 @@ export default function App() {
   const [filterPlatform, setFilterPlatform] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
   const [toast, setToast]       = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser]           = useState(null);
   const [userPerms, setUserPerms] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -806,6 +839,36 @@ export default function App() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #1e2d45; border-radius: 3px; }
         input[type=range] { cursor:pointer; }
+
+        /* Expandable topic content */
+        .topic-expand-content { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; }
+        .topic-expand-content.expanded { max-height: 600px; }
+
+        /* Sidebar slide */
+        .sidebar { transition: transform 0.3s ease; }
+
+        /* Hamburger — hidden on desktop */
+        .hamburger-btn {
+          display: none;
+          position: fixed; top: 12px; left: 12px; z-index: 200;
+          background: #111827; border: 1px solid #1e2d45; color: #e2e8f0;
+          border-radius: 8px; padding: 0; cursor: pointer;
+          font-size: 20px; line-height: 1;
+          min-width: 44px; min-height: 44px;
+          align-items: center; justify-content: center;
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+          .hamburger-btn { display: flex; }
+          .sidebar { transform: translateX(100%); }
+          .sidebar.sidebar-open { transform: translateX(0); }
+          .main-content { margin-right: 0 !important; padding: 64px 12px 40px !important; }
+          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          nav button { min-height: 44px !important; }
+          body { font-size: 16px; }
+          .report-header-actions { flex-wrap: wrap; gap: 6px; }
+        }
       `}</style>
 
       {/* ── Toast ─────────────────────────────────────────── */}
@@ -820,8 +883,21 @@ export default function App() {
         }}>{toast.msg}</div>
       )}
 
+      {/* ── Hamburger button (mobile only) ────────────────── */}
+      <button className="hamburger-btn" onClick={() => setSidebarOpen(true)} aria-label="פתח תפריט">
+        ☰
+      </button>
+
+      {/* ── Sidebar overlay (mobile only) ─────────────────── */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 99 }}
+        />
+      )}
+
       {/* ── Sidebar ───────────────────────────────────────── */}
-      <div style={{
+      <div className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`} style={{
         position: "fixed", top: 0, right: 0, bottom: 0, width: 220,
         background: T.panel, borderLeft: `1px solid ${T.border}`,
         display: "flex", flexDirection: "column",
@@ -843,7 +919,7 @@ export default function App() {
         {/* Nav */}
         <nav style={{ padding: "12px 10px", flex: 1 }}>
           {navItems.map(item => (
-            <button key={item.id} onClick={() => setTab(item.id)} style={{
+            <button key={item.id} onClick={() => { setTab(item.id); setSidebarOpen(false); }} style={{
               width: "100%", display: "flex", alignItems: "center", gap: 10,
               background: tab === item.id ? T.accent + "22" : "none",
               border: `1px solid ${tab === item.id ? T.accent + "55" : "transparent"}`,
@@ -887,7 +963,7 @@ export default function App() {
             {activeSources.length} מקורות פעילים
           </div>
           <button
-            onClick={runDigest}
+            onClick={() => { runDigest(); setSidebarOpen(false); }}
             disabled={running}
             style={{
               width: "100%", background: running ? T.muted : `linear-gradient(135deg,${T.accent},${T.accentHi})`,
@@ -910,13 +986,13 @@ export default function App() {
       </div>
 
       {/* ── Main content ──────────────────────────────────── */}
-      <div style={{ marginRight: 220, padding: "28px 28px 40px" }}>
+      <div className="main-content" style={{ marginRight: 220, padding: "28px 28px 40px" }}>
 
         {/* ── SOURCES TAB ────────────────────────────────── */}
         {tab === "sources" && (
           <>
             {/* Stats row */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 24 }}>
+            <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 24 }}>
               {statCards.map(s => (
                 <div key={s.label} style={{
                   background: T.panel, border: `1px solid ${T.border}`,
@@ -975,9 +1051,10 @@ export default function App() {
 
             {/* Sources table */}
             <div style={{ background: T.panel, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
+              <div style={{ overflowX: "auto" }}>
               {/* Header */}
               <div style={{
-                display: "grid", gridTemplateColumns: "2.5fr 1fr 1.3fr 80px 70px 80px",
+                display: "grid", gridTemplateColumns: "2.5fr 1fr 1.3fr 80px 70px 80px", minWidth: 640,
                 gap: 0, padding: "10px 18px",
                 borderBottom: `1px solid ${T.border}`,
                 background: T.card,
@@ -998,7 +1075,7 @@ export default function App() {
                 const cm = CATEGORY_META[src.category] || CATEGORY_META["כללי"];
                 return (
                   <div key={src.id} style={{
-                    display: "grid", gridTemplateColumns: "2.5fr 1fr 1.3fr 80px 70px 80px",
+                    display: "grid", gridTemplateColumns: "2.5fr 1fr 1.3fr 80px 70px 80px", minWidth: 640,
                     padding: "13px 18px", alignItems: "center",
                     background: i % 2 === 0 ? T.panel : T.card + "80",
                     borderBottom: `1px solid ${T.border}`,
@@ -1043,6 +1120,7 @@ export default function App() {
                   </div>
                 );
               })}
+              </div>
             </div>
 
             {/* Last report preview */}
