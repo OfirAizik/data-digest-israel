@@ -1,0 +1,372 @@
+import { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabase";
+
+const T = {
+  bg:        "#0a0f1a",
+  panel:     "#111827",
+  card:      "#1a2236",
+  border:    "#1e2d45",
+  accent:    "#2563eb",
+  accentHi:  "#3b82f6",
+  gold:      "#f59e0b",
+  green:     "#10b981",
+  red:       "#ef4444",
+  muted:     "#4b5563",
+  text:      "#e2e8f0",
+  textDim:   "#94a3b8",
+  textFaint: "#4b5563",
+};
+
+const Toggle = ({ on, onChange }) => (
+  <div onClick={() => onChange(!on)} style={{
+    width: 36, height: 20, borderRadius: 10,
+    background: on ? T.green : T.muted,
+    position: "relative", cursor: "pointer",
+    transition: "background .25s", flexShrink: 0,
+  }}>
+    <div style={{
+      width: 14, height: 14, borderRadius: "50%", background: "#fff",
+      position: "absolute", top: 3,
+      left: on ? 19 : 3,
+      transition: "left .25s",
+    }}/>
+  </div>
+);
+
+const EMPTY_FORM = { name: "", username: "", category: "", is_active: true, is_member: false, notes: "" };
+
+export default function ChannelsScreen({ isAdmin }) {
+  const [channels,    setChannels]  = useState([]);
+  const [loading,     setLoading]   = useState(true);
+  const [error,       setError]     = useState("");
+  const [toast,       setToast]     = useState("");
+  const [saving,      setSaving]    = useState(null);
+  const [showForm,    setShowForm]  = useState(false);
+  const [form,        setForm]      = useState(EMPTY_FORM);
+  const [submitting,  setSubmitting]= useState(false);
+  const [deleteId,    setDeleteId]  = useState(null);
+
+  useEffect(() => { fetchChannels(); }, []);
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+
+  const fetchChannels = async () => {
+    setLoading(true);
+    const { data, error: err } = await supabase
+      .from("telegram_channels")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (err) { setError(`שגיאה: ${err.message}`); setLoading(false); return; }
+    setChannels(data || []);
+    setLoading(false);
+  };
+
+  const toggleActive = async (id, val) => {
+    setSaving(id);
+    setChannels(prev => prev.map(c => c.id === id ? { ...c, is_active: val } : c));
+    const { error: err } = await supabase
+      .from("telegram_channels").update({ is_active: val }).eq("id", id);
+    if (err) { setError(`שגיאת שמירה: ${err.message}`); fetchChannels(); }
+    else showToast(val ? "✅ ערוץ הופעל" : "✅ ערוץ הושבת");
+    setSaving(null);
+  };
+
+  const addChannel = async () => {
+    if (!form.name.trim() || !form.username.trim()) return;
+    setSubmitting(true);
+    const { error: err } = await supabase.from("telegram_channels").insert({
+      name:      form.name.trim(),
+      username:  form.username.trim(),
+      category:  form.category.trim() || null,
+      is_active: form.is_active,
+      is_member: form.is_member,
+      notes:     form.notes.trim() || null,
+    });
+    if (err) setError(`שגיאת הוספה: ${err.message}`);
+    else {
+      showToast("✅ ערוץ נוסף בהצלחה");
+      setForm(EMPTY_FORM);
+      setShowForm(false);
+      fetchChannels();
+    }
+    setSubmitting(false);
+  };
+
+  const confirmDelete = async () => {
+    const { error: err } = await supabase
+      .from("telegram_channels").delete().eq("id", deleteId);
+    if (err) setError(`שגיאת מחיקה: ${err.message}`);
+    else { showToast("✅ ערוץ נמחק"); fetchChannels(); }
+    setDeleteId(null);
+  };
+
+  const colTemplate = isAdmin
+    ? "2fr 1.3fr 1fr 1fr 70px 70px 1.5fr 44px"
+    : "2fr 1.3fr 1fr 1fr 70px 70px 1.5fr";
+
+  return (
+    <div style={{ direction: "rtl" }}>
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <h3 style={{ color: T.text, fontSize: 16, fontWeight: 700 }}>📡 ניהול ערוצים</h3>
+        {isAdmin && (
+          <button
+            onClick={() => setShowForm(v => !v)}
+            style={{
+              background: T.accent, border: "none", color: "#fff",
+              borderRadius: 8, padding: "8px 16px", cursor: "pointer",
+              fontSize: 13, fontWeight: 700,
+            }}
+          >
+            ➕ ערוץ חדש
+          </button>
+        )}
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
+          background: "#14532d", border: `1px solid ${T.green}`,
+          color: "#fff", borderRadius: 10, padding: "10px 20px",
+          fontSize: 14, fontWeight: 600, zIndex: 2000,
+        }}>{toast}</div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div style={{
+          background: "#7f1d1d44", border: `1px solid ${T.red}66`,
+          borderRadius: 8, padding: "10px 14px", marginBottom: 16,
+          color: "#fca5a5", fontSize: 13,
+        }}>
+          ⚠️ {error}
+        </div>
+      )}
+
+      {/* Add form */}
+      {isAdmin && showForm && (
+        <div style={{
+          background: T.panel, border: `1px solid ${T.border}`,
+          borderRadius: 12, padding: 20, marginBottom: 20,
+        }}>
+          <h4 style={{ color: T.text, fontSize: 14, fontWeight: 700, marginBottom: 16 }}>הוספת ערוץ חדש</h4>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            {[
+              { key: "name",     label: "שם *",         placeholder: "Machine & Deep Learning Israel", ltr: false },
+              { key: "username", label: "שם משתמש *",   placeholder: "MDLI1",                         ltr: true  },
+              { key: "category", label: "קטגוריה",      placeholder: "ML/DL/AI",                      ltr: false },
+              { key: "notes",    label: "הערות",        placeholder: "הערות אופציונליות",              ltr: false },
+            ].map(f => (
+              <div key={f.key}>
+                <label style={{ color: T.textDim, fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>
+                  {f.label}
+                </label>
+                <input
+                  value={form[f.key]}
+                  onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                  placeholder={f.placeholder}
+                  style={{
+                    width: "100%", background: T.card, border: `1px solid ${T.border}`,
+                    borderRadius: 8, padding: "9px 12px", color: T.text,
+                    fontSize: 13, outline: "none",
+                    direction: f.ltr ? "ltr" : "rtl",
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", gap: 20, marginBottom: 16 }}>
+            {[
+              { key: "is_active", label: "פעיל",        color: T.green    },
+              { key: "is_member", label: "חבר בקבוצה",  color: T.accentHi },
+            ].map(f => (
+              <label key={f.key} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: T.textDim, fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  checked={form[f.key]}
+                  onChange={e => setForm(p => ({ ...p, [f.key]: e.target.checked }))}
+                  style={{ accentColor: f.color, width: 15, height: 15 }}
+                />
+                {f.label}
+              </label>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={addChannel}
+              disabled={submitting || !form.name.trim() || !form.username.trim()}
+              style={{
+                background: T.accent, border: "none", color: "#fff",
+                borderRadius: 8, padding: "9px 20px", cursor: "pointer",
+                fontSize: 13, fontWeight: 700,
+                opacity: (submitting || !form.name.trim() || !form.username.trim()) ? 0.5 : 1,
+              }}
+            >
+              {submitting ? "שומר..." : "הוסף ערוץ"}
+            </button>
+            <button
+              onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }}
+              style={{
+                background: "none", border: `1px solid ${T.border}`, color: T.textDim,
+                borderRadius: 8, padding: "9px 16px", cursor: "pointer", fontSize: 13,
+              }}
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {deleteId && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,.7)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+        }}>
+          <div style={{
+            background: T.panel, border: `1px solid ${T.border}`,
+            borderRadius: 14, padding: "28px 32px", maxWidth: 340, textAlign: "center",
+          }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🗑️</div>
+            <div style={{ color: T.text, fontSize: 15, fontWeight: 700, marginBottom: 8 }}>מחיקת ערוץ</div>
+            <div style={{ color: T.textDim, fontSize: 13, marginBottom: 24 }}>האם אתה בטוח? פעולה זו אינה הפיכה.</div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button
+                onClick={confirmDelete}
+                style={{
+                  background: T.red, border: "none", color: "#fff",
+                  borderRadius: 8, padding: "9px 20px", cursor: "pointer",
+                  fontSize: 13, fontWeight: 700,
+                }}
+              >
+                מחק
+              </button>
+              <button
+                onClick={() => setDeleteId(null)}
+                style={{
+                  background: "none", border: `1px solid ${T.border}`, color: T.textDim,
+                  borderRadius: 8, padding: "9px 16px", cursor: "pointer", fontSize: 13,
+                }}
+              >
+                ביטול
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div style={{ background: T.panel, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
+        {/* Header row */}
+        <div style={{
+          display: "grid", gridTemplateColumns: colTemplate,
+          padding: "10px 16px", background: T.card,
+          borderBottom: `1px solid ${T.border}`,
+        }}>
+          {["שם", "שם משתמש", "פלטפורמה", "קטגוריה", "פעיל", "חבר", "הערות", ...(isAdmin ? [""] : [])].map((h, i) => (
+            <div key={i} style={{ color: T.textFaint, fontSize: 11, fontWeight: 700, letterSpacing: "0.05em" }}>{h}</div>
+          ))}
+        </div>
+
+        {loading && (
+          <div style={{ padding: 40, textAlign: "center", color: T.textDim }}>טוען...</div>
+        )}
+
+        {!loading && channels.length === 0 && (
+          <div style={{ padding: 40, textAlign: "center", color: T.textDim }}>
+            אין ערוצים.{isAdmin && " לחץ על ״ערוץ חדש״ להוספה."}
+          </div>
+        )}
+
+        {!loading && channels.map((ch, i) => (
+          <div key={ch.id} style={{
+            display: "grid", gridTemplateColumns: colTemplate,
+            padding: "12px 16px", alignItems: "center",
+            background: i % 2 === 0 ? T.panel : T.card + "80",
+            borderBottom: `1px solid ${T.border}`,
+            opacity: saving === ch.id ? 0.6 : 1, transition: "opacity .2s",
+          }}>
+            {/* Name */}
+            <div style={{ color: T.text, fontSize: 13, fontWeight: 600 }}>{ch.name}</div>
+
+            {/* Username */}
+            <div style={{ color: T.accentHi, fontSize: 12, fontFamily: "monospace", direction: "ltr" }}>
+              @{ch.username}
+            </div>
+
+            {/* Platform */}
+            <div>
+              <span style={{
+                background: "#229ed922", color: "#229ed9",
+                border: "1px solid #229ed944",
+                borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700,
+              }}>
+                {ch.platform === "telegram" ? "✈️ טלגרם" : ch.platform}
+              </span>
+            </div>
+
+            {/* Category */}
+            <div style={{ color: T.textDim, fontSize: 12 }}>{ch.category || "—"}</div>
+
+            {/* is_active */}
+            <div>
+              {isAdmin ? (
+                <Toggle on={!!ch.is_active} onChange={val => toggleActive(ch.id, val)} />
+              ) : (
+                <span style={{
+                  background: ch.is_active ? T.green + "22" : T.muted + "22",
+                  color:      ch.is_active ? T.green       : T.muted,
+                  border:    `1px solid ${ch.is_active ? T.green + "44" : T.muted + "44"}`,
+                  borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700,
+                }}>
+                  {ch.is_active ? "פעיל" : "לא פעיל"}
+                </span>
+              )}
+            </div>
+
+            {/* is_member */}
+            <div>
+              <span style={{
+                background: ch.is_member ? T.accentHi + "22" : T.muted + "22",
+                color:      ch.is_member ? T.accentHi       : T.muted,
+                border:    `1px solid ${ch.is_member ? T.accentHi + "44" : T.muted + "44"}`,
+                borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700,
+              }}>
+                {ch.is_member ? "חבר" : "לא חבר"}
+              </span>
+            </div>
+
+            {/* Notes */}
+            <div style={{
+              color: T.textFaint, fontSize: 12,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {ch.notes || "—"}
+            </div>
+
+            {/* Delete (admin only) */}
+            {isAdmin && (
+              <div>
+                <button
+                  onClick={() => setDeleteId(ch.id)}
+                  title="מחק ערוץ"
+                  style={{
+                    background: "none", border: `1px solid ${T.border}`,
+                    color: T.red, borderRadius: 6, padding: "4px 7px",
+                    cursor: "pointer", fontSize: 13, lineHeight: 1,
+                  }}
+                >
+                  🗑️
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

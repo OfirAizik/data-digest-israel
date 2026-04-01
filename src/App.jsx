@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 import LoginScreen from "./components/LoginScreen";
 import LogsScreen from "./components/LogsScreen";
 import UsersScreen from "./components/UsersScreen";
+import ChannelsScreen from "./components/ChannelsScreen";
 
 /* ─── palette & tokens ────────────────────────────────────── */
 const T = {
@@ -208,6 +209,7 @@ const Icon = ({ name, size=16 }) => {
     refresh: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
     eye:     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
     toggle:  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="5" width="22" height="14" rx="7" ry="7"/><circle cx="8" cy="12" r="3" fill="currentColor"/></svg>,
+    broadcast:<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20v-6"/><circle cx="12" cy="17" r="2"/><path d="M6.34 14.66a5 5 0 0 1 0-5.32"/><path d="M17.66 14.66a5 5 0 0 0 0-5.32"/><path d="M2.1 18.1a10 10 0 0 1 0-12.2"/><path d="M21.9 18.1a10 10 0 0 0 0-12.2"/></svg>,
   };
   return icons[name] || null;
 };
@@ -815,8 +817,9 @@ export default function App() {
   if (!user) return <LoginScreen onLogin={(u) => { setUser(u); fetchUserPerms(u.id); }} />;
 
   const navItems = [
-    { id: "sources",  label: "מקורות",   icon: "db",       show: userPerms?.can_access_sources  !== false },
-    { id: "settings", label: "הגדרות",   icon: "settings", show: userPerms?.can_access_settings !== false },
+    { id: "sources",   label: "מקורות",  icon: "db",        show: userPerms?.can_access_sources  !== false },
+    { id: "channels",  label: "ערוצים",  icon: "broadcast", show: userPerms?.can_access_sources  !== false },
+    { id: "settings",  label: "הגדרות",  icon: "settings",  show: userPerms?.can_access_settings !== false },
     { id: "history",  label: "היסטוריה", icon: "report",   show: userPerms?.can_access_history  !== false },
     { id: "logs",     label: "לוגים",    icon: "report",   show: !!userPerms?.can_access_logs   },
     { id: "users",    label: "משתמשים",  icon: "toggle",   show: userPerms?.role === "admin"    },
@@ -1180,6 +1183,9 @@ export default function App() {
             </button>
           </div>
         )}
+
+        {/* ── CHANNELS TAB ─────────────────────────────────── */}
+        {tab === "channels" && <ChannelsScreen isAdmin={userPerms?.role === "admin"} />}
 
         {/* ── LOGS TAB ─────────────────────────────────────── */}
         {tab === "logs" && <LogsScreen />}
