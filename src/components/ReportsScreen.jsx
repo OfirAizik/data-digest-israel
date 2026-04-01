@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
@@ -35,7 +37,7 @@ function TrendBadge({ trend }) {
   );
 }
 
-// Chevron that rotates when open
+// Chevron that rotates when open — pointerEvents:none so clicks reach the parent div
 function Chevron({ open }) {
   return (
     <svg
@@ -45,6 +47,7 @@ function Chevron({ open }) {
         flexShrink: 0, color: T.textFaint,
         transform: open ? "rotate(180deg)" : "rotate(0deg)",
         transition: "transform .2s",
+        pointerEvents: "none",
       }}
     >
       <polyline points="6 9 12 15 18 9" />
@@ -67,6 +70,7 @@ function TopicRow({ topic, index }) {
           display: "flex", alignItems: "center", gap: 10,
           background: open ? T.card + "80" : "transparent",
           transition: "background .15s",
+          userSelect: "none",
         }}
       >
         {/* Number bubble */}
@@ -75,12 +79,13 @@ function TopicRow({ topic, index }) {
           borderRadius: "50%", width: 22, height: 22, flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 11, fontWeight: 800,
+          pointerEvents: "none",
         }}>
           {index + 1}
         </span>
 
         {/* Title + trend */}
-        <span style={{ color: T.text, fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0 }}>
+        <span style={{ color: T.text, fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0, pointerEvents: "none" }}>
           {topic.title}
         </span>
         <TrendBadge trend={topic.trend} />
@@ -183,6 +188,7 @@ function ReportCard({ report }) {
           display: "flex", alignItems: "center", justifyContent: "space-between",
           gap: 12, background: open ? T.card + "50" : "transparent",
           transition: "background .15s",
+          userSelect: "none",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
@@ -199,6 +205,7 @@ function ReportCard({ report }) {
             background: T.accentHi + "18", color: T.accentHi,
             border: `1px solid ${T.accentHi}33`,
             borderRadius: 6, padding: "3px 10px", fontSize: 12, fontWeight: 600,
+            pointerEvents: "none",
           }}>
             📡 {report.source || "—"}
           </span>
@@ -207,6 +214,7 @@ function ReportCard({ report }) {
           <span style={{
             background: T.card, border: `1px solid ${T.border}`,
             borderRadius: 6, padding: "3px 9px", color: T.textDim, fontSize: 12, fontWeight: 600,
+            pointerEvents: "none",
           }}>
             {report.total_posts ?? "—"} פוסטים
           </span>
@@ -215,6 +223,7 @@ function ReportCard({ report }) {
           <span style={{
             background: T.card, border: `1px solid ${T.border}`,
             borderRadius: 6, padding: "3px 9px", color: T.textFaint, fontSize: 12,
+            pointerEvents: "none",
           }}>
             {topics.length} נושאים
           </span>
