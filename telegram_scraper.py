@@ -38,7 +38,6 @@ async def scrape_channel(client, channel, limit=50):
             continue
 
         msg_date = message.date
-        # Ensure offset-aware for comparison
         if msg_date.tzinfo is None:
             msg_date = msg_date.replace(tzinfo=timezone.utc)
 
@@ -58,6 +57,7 @@ async def scrape_channel(client, channel, limit=50):
 
 
 def summarize_with_claude(messages):
+    """Returns (topics_list, usage_dict)."""
     lines = []
     for m in messages:
         week_tag = "[השבוע]" if m["is_this_week"] else ""
@@ -107,12 +107,14 @@ def summarize_with_claude(messages):
     with urllib.request.urlopen(req) as response:
         result = json.loads(response.read().decode("utf-8"))
 
+    usage = result.get("usage", {})
+
     raw_text = result["content"][0]["text"].strip()
     if raw_text.startswith("```"):
         raw_text = raw_text.split("```")[1]
         if raw_text.startswith("json"):
             raw_text = raw_text[4:]
-    return json.loads(raw_text.strip())
+    return json.loads(raw_text.strip()), usage
 
 
 def save_to_supabase(report):
@@ -145,50 +147,125 @@ def save_to_supabase(report):
         raise
 
 
+def save_run_log(log_data):
+    """Write a row to run_logs. Failures are printed but never re-raised."""
+    payload = json.dumps(log_data, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(
+        f"{SUPABASE_URL}/rest/v1/run_logs",
+        data=payload,
+        headers={
+            "apikey":        SUPABASE_SERVICE_KEY,
+            "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+            "Content-Type":  "application/json",
+            "Prefer":        "return=minimal",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req) as response:
+            print(f"Run log saved (HTTP {response.status}).")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8")
+        print(f"Warning: failed to save run log {e.code}: {body}")
+    except Exception as e:
+        print(f"Warning: failed to save run log: {e}")
+
+
 async def main():
+    started_at    = datetime.now(timezone.utc).isoformat()
+    channels_list = []
+    total_tokens  = 0
+    cost_usd      = 0.0
+
     print("Starting Telegram scraper...")
 
-    channels = fetch_active_channels()
-    if not channels:
-        print("No active channels found in Supabase. Exiting.")
-        return
+    try:
+        channels_list = fetch_active_channels()
+        if not channels_list:
+            print("No active channels found in Supabase. Exiting.")
+            save_run_log({
+                "started_at":      started_at,
+                "status":          "success",
+                "user_email":      "telegram-scraper",
+                "sources_scanned": 0,
+                "total_tokens":    0,
+                "cost_usd":        0.0,
+            })
+            return
 
-    session_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "digest_session")
-    client = TelegramClient(session_path, TELEGRAM_API_ID, TELEGRAM_API_HASH)
-    await client.start()
-    print("Connected to Telegram.")
+        session_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "digest_session")
+        client = TelegramClient(session_path, TELEGRAM_API_ID, TELEGRAM_API_HASH)
+        await client.start()
+        print("Connected to Telegram.")
 
-    all_messages = []
-    for channel in channels:
-        print(f"Scraping channel: {channel}")
-        messages = await scrape_channel(client, channel)
-        print(f"  Collected {len(messages)} messages from {channel}")
-        all_messages.extend(messages)
+        all_messages = []
+        try:
+            for channel in channels_list:
+                print(f"Scraping channel: {channel}")
+                messages = await scrape_channel(client, channel)
+                print(f"  Collected {len(messages)} messages from {channel}")
+                all_messages.extend(messages)
+        finally:
+            await client.disconnect()
 
-    await client.disconnect()
+        if not all_messages:
+            print("No messages collected. Exiting.")
+            save_run_log({
+                "started_at":      started_at,
+                "status":          "success",
+                "user_email":      "telegram-scraper",
+                "sources_scanned": len(channels_list),
+                "total_tokens":    0,
+                "cost_usd":        0.0,
+            })
+            return
 
-    if not all_messages:
-        print("No messages collected. Exiting.")
-        return
+        print(f"Total messages collected: {len(all_messages)}")
+        print("Sending messages to Claude for summarization...")
 
-    print(f"Total messages collected: {len(all_messages)}")
-    print("Sending messages to Claude for summarization...")
+        topics, usage = summarize_with_claude(all_messages)
+        print(f"Received {len(topics)} topics from Claude.")
 
-    topics = summarize_with_claude(all_messages)
-    print(f"Received {len(topics)} topics from Claude.")
+        input_tokens  = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+        total_tokens  = input_tokens + output_tokens
+        # claude-sonnet-4-6: $3/MTok input, $15/MTok output
+        cost_usd = round((input_tokens * 3 + output_tokens * 15) / 1_000_000, 6)
+        print(f"Tokens: {total_tokens} (in:{input_tokens} out:{output_tokens}), cost: ${cost_usd:.6f}")
 
-    report = {
-        "report_date":         date.today().isoformat(),
-        "source":              ", ".join(channels),
-        "total_posts_analyzed": len(all_messages),
-        "topics":              topics,
-    }
+        report = {
+            "report_date":          date.today().isoformat(),
+            "source":               ", ".join(channels_list),
+            "total_posts_analyzed": len(all_messages),
+            "topics":               topics,
+        }
 
-    print("Saving report to Supabase...")
-    status = save_to_supabase(report)
-    print(f"Saved to Supabase (HTTP {status}).")
+        print("Saving report to Supabase...")
+        status = save_to_supabase(report)
+        print(f"Saved to Supabase (HTTP {status}).")
 
-    print("Done.")
+        save_run_log({
+            "started_at":      started_at,
+            "status":          "success",
+            "user_email":      "telegram-scraper",
+            "sources_scanned": len(channels_list),
+            "total_tokens":    total_tokens,
+            "cost_usd":        cost_usd,
+        })
+        print("Done.")
+
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        save_run_log({
+            "started_at":      started_at,
+            "status":          "error",
+            "user_email":      "telegram-scraper",
+            "sources_scanned": len(channels_list),
+            "total_tokens":    total_tokens,
+            "cost_usd":        cost_usd,
+            "error_message":   str(e)[:1000],
+        })
+        raise
 
 
 asyncio.run(main())
