@@ -661,7 +661,7 @@ const SettingsPanel = ({ cfg, onChange }) => {
    MAIN APP
 ═══════════════════════════════════════════════════════════ */
 export default function App() {
-  const [tab, setTab]         = useState("sources");   // sources | settings | history
+  const [tab, setTab]         = useState("sources");   // sources | settings
   const [sources, setSources] = useState(DEFAULT_SOURCES);
   const [cfg, setCfg]         = useState(() => ({
     intervalDays: 2,
@@ -672,7 +672,6 @@ export default function App() {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState("");
   const [report, setReport]   = useState(null);        // current report
-  const [history, setHistory] = useState([]);
   const [filterPlatform, setFilterPlatform] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
   const [toast, setToast]       = useState(null);
@@ -763,7 +762,6 @@ export default function App() {
       const { result, usage } = await callClaude(cfg.claudeKey, sources, cfg.intervalDays || 2);
 
       setReport(result);
-      setHistory(prev => [{ ...result, id: Date.now() }, ...prev.slice(0, 9)]);
       showToast("✅ דוח נוצר בהצלחה!", "ok");
 
       // Log to Supabase
@@ -806,7 +804,7 @@ export default function App() {
     { label: "מקורות כולל", value: sources.length,        color: T.accentHi, icon: "db"      },
     { label: "מקורות פעילים", value: activeSources.length, color: T.green,    icon: "check"   },
     { label: "פלטפורמות",    value: platforms.length,      color: T.gold,     icon: "settings" },
-    { label: "דוחות שנוצרו", value: history.length,        color: T.orange,   icon: "report"  },
+    { label: "דוחות שנוצרו", value: "—",                    color: T.orange,   icon: "report"  },
   ];
 
   if (authLoading) return (
@@ -822,7 +820,6 @@ export default function App() {
     { id: "reports",   label: "דוחות",   icon: "report",    show: userPerms?.can_access_sources  !== false },
     { id: "channels",  label: "ערוצים",  icon: "broadcast", show: userPerms?.can_access_sources  !== false },
     { id: "settings",  label: "הגדרות",  icon: "settings",  show: userPerms?.can_access_settings !== false },
-    { id: "history",  label: "היסטוריה", icon: "report",   show: userPerms?.can_access_history  !== false },
     { id: "logs",     label: "לוגים",    icon: "report",   show: !!userPerms?.can_access_logs   },
     { id: "users",    label: "משתמשים",  icon: "toggle",   show: userPerms?.role === "admin"    },
   ].filter(item => item.show);
@@ -1199,50 +1196,6 @@ export default function App() {
         {tab === "users" && <UsersScreen />}
 
         {/* ── HISTORY TAB ──────────────────────────────────── */}
-        {tab === "history" && (
-          <div>
-            <h3 style={{ color: T.text, fontSize: 16, fontWeight: 700, marginBottom: 20 }}>📋 היסטוריית דוחות</h3>
-            {history.length === 0 ? (
-              <div style={{
-                background: T.panel, border: `1px solid ${T.border}`, borderRadius: 14,
-                padding: "60px 40px", textAlign: "center", color: T.textDim,
-              }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
-                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>אין דוחות עדיין</div>
-                <div style={{ fontSize: 13 }}>לחץ "הפעל דוח" כדי לייצר את הדוח הראשון</div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {history.map((r, i) => (
-                  <div key={r.id} style={{
-                    background: T.panel, border: `1px solid ${T.border}`, borderRadius: 12,
-                    padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center",
-                  }}>
-                    <div>
-                      <div style={{ color: T.text, fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
-                        {i === 0 && <span style={{ color: T.green, marginLeft: 8 }}>● עדכני</span>}
-                        דוח #{history.length - i}
-                      </div>
-                      <div style={{ color: T.textDim, fontSize: 12 }}>
-                        {new Date(r.generated_at).toLocaleString("he-IL")} •
-                        {r.sources_scanned} מקורות •
-                        {(r.categories || []).length} קטגוריות
-                      </div>
-                    </div>
-                    <button onClick={() => setReport(r)} style={{
-                      background: T.accent + "22", border: `1px solid ${T.accent}55`,
-                      color: T.accentHi, borderRadius: 8, padding: "7px 14px",
-                      cursor: "pointer", fontSize: 12, fontWeight: 700,
-                      display: "flex", alignItems: "center", gap: 6,
-                    }}>
-                      <Icon name="eye" size={13}/> צפה
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* ── Modals ───────────────────────────────────────── */}
