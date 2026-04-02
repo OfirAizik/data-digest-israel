@@ -73,21 +73,23 @@ def summarize_with_claude(messages):
         "Below are Telegram messages with engagement metrics. "
         "Identify the 5 most important topics and return a JSON array with exactly 5 objects.\n\n"
         "Each object must have these fields:\n"
-        "  title          (string)  – topic name\n"
-        "  summary        (string)  – 2-3 sentence description\n"
-        "  posts_count    (integer) – number of posts on this topic\n"
-        "  trend          (string)  – one of: עולה / יורד / יציב\n"
-        "  top_post_url   (string)  – URL of the most viewed or replied post on this topic\n"
-        "  weekly_posts_count (integer) – how many posts on this topic are from this week\n"
-        "  avg_views      (integer) – average views across posts on this topic\n\n"
+        "  title               (string)   – topic name in Hebrew\n"
+        "  summary             (string)   – 1-2 sentence description in Hebrew\n"
+        "  posts_count         (integer)  – number of posts on this topic\n"
+        "  trend               (string)   – one of: עולה / יורד / יציב\n"
+        "  top_post_url        (string)   – URL of the most viewed or replied post on this topic (from the URLs provided above)\n"
+        "  weekly_posts_count  (integer)  – how many posts on this topic are from this week\n"
+        "  avg_views           (integer)  – average views across posts on this topic\n"
+        "  discussion_points   (array)    – 3 to 5 strings, each describing a specific point discussed in the posts\n"
+        "  key_reactions       (array)    – 2 to 3 strings, each describing a main community reaction or sentiment\n\n"
         "Messages:\n"
         + "\n---\n".join(lines)
-        + "\n\nRespond with only valid JSON — an array of 5 topic objects."
+        + "\n\nRespond with only valid JSON — an array of exactly 5 topic objects. No text before or after."
     )
 
     payload = json.dumps({
         "model": "claude-sonnet-4-6",
-        "max_tokens": 1500,
+        "max_tokens": 3000,
         "messages": [{"role": "user", "content": prompt}],
     }).encode("utf-8")
 

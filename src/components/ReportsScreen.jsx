@@ -54,9 +54,28 @@ function Chevron({ open }) {
   );
 }
 
-function TopicRow({ topic, index, isOpen, onToggle }) {
+function SectionLabel({ children }) {
+  return (
+    <div style={{
+      color: T.textFaint, fontSize: 10, fontWeight: 700,
+      letterSpacing: "0.08em", textTransform: "uppercase",
+      marginBottom: 6,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+// Three-level topic row:
+//   Level 1 (isOpen=false):            header only
+//   Level 2 (isOpen=true, isDeep=false): summary + stats + "הצג עומק" button
+//   Level 3 (isOpen=true, isDeep=true):  + discussion points + key reactions + top post link
+function TopicRow({ topic, index, isOpen, isDeep, onToggle, onToggleDeep }) {
+  const hasDepth = (topic.discussion_points?.length > 0) || (topic.key_reactions?.length > 0);
+
   return (
     <div style={{ borderBottom: `1px solid ${T.border}` }}>
+      {/* ── Level 1: header (always visible) ── */}
       <div
         onClick={onToggle}
         style={{
@@ -71,26 +90,35 @@ function TopicRow({ topic, index, isOpen, onToggle }) {
           background: T.accent + "33", color: T.accentHi,
           borderRadius: "50%", width: 22, height: 22, flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 11, fontWeight: 800,
-          pointerEvents: "none",
+          fontSize: 11, fontWeight: 800, pointerEvents: "none",
         }}>
           {index + 1}
         </span>
-        <span style={{ color: T.text, fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0, pointerEvents: "none" }}>
+        <span style={{
+          color: T.text, fontSize: 13, fontWeight: 700,
+          flex: 1, minWidth: 0, pointerEvents: "none",
+        }}>
           {topic.title}
         </span>
         <TrendBadge trend={topic.trend} />
         <Chevron open={isOpen} />
       </div>
 
+      {/* ── Level 2: summary + stats ── */}
       {isOpen && (
-        <div style={{ padding: "12px 20px 16px 52px", background: T.card + "40" }}>
+        <div style={{ padding: "14px 20px 16px 52px", background: T.card + "40" }}>
+          {/* Summary */}
           {topic.summary && (
-            <p style={{ color: T.textDim, fontSize: 13, lineHeight: 1.65, marginBottom: 12 }}>
-              {topic.summary}
-            </p>
+            <>
+              <SectionLabel>סיכום</SectionLabel>
+              <p style={{ color: T.textDim, fontSize: 13, lineHeight: 1.65, marginBottom: 14 }}>
+                {topic.summary}
+              </p>
+            </>
           )}
-          <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: topic.top_post_url ? 12 : 0 }}>
+
+          {/* Stats row */}
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 14 }}>
             {topic.posts_count != null && (
               <div>
                 <div style={{ color: T.textFaint, fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", marginBottom: 2 }}>
@@ -118,24 +146,93 @@ function TopicRow({ topic, index, isOpen, onToggle }) {
               </div>
             )}
           </div>
-          {topic.top_post_url && (
-            <a
-              href={topic.top_post_url}
-              target="_blank"
-              rel="noopener noreferrer"
+
+          {/* "הצג עומק" toggle button */}
+          {hasDepth && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleDeep(); }}
               style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                color: T.accentHi, fontSize: 12, fontWeight: 600,
-                textDecoration: "none",
+                background: isDeep ? T.card : T.accent + "22",
+                border: `1px solid ${isDeep ? T.border : T.accentHi + "55"}`,
+                color: isDeep ? T.textDim : T.accentHi,
+                borderRadius: 7, padding: "5px 12px",
+                fontSize: 12, fontWeight: 600, cursor: "pointer",
+                transition: "all .15s",
               }}
             >
-              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                <polyline points="15 3 21 3 21 9"/>
-                <line x1="10" y1="14" x2="21" y2="3"/>
-              </svg>
-              פתח פוסט מוביל
-            </a>
+              {isDeep ? "▲ הסתר עומק" : "▼ הצג עומק"}
+            </button>
+          )}
+
+          {/* ── Level 3: deep analysis ── */}
+          {isDeep && (
+            <div style={{
+              marginTop: 16,
+              borderTop: `1px solid ${T.border}`,
+              paddingTop: 16,
+              display: "flex", flexDirection: "column", gap: 16,
+            }}>
+              {/* Discussion points */}
+              {topic.discussion_points?.length > 0 && (
+                <div>
+                  <SectionLabel>נקודות דיון מרכזיות</SectionLabel>
+                  <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
+                    {topic.discussion_points.map((pt, i) => (
+                      <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                        <span style={{
+                          color: T.accentHi, fontSize: 12, fontWeight: 700,
+                          marginTop: 1, flexShrink: 0,
+                        }}>•</span>
+                        <span style={{ color: T.textDim, fontSize: 13, lineHeight: 1.6 }}>{pt}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Key reactions */}
+              {topic.key_reactions?.length > 0 && (
+                <div>
+                  <SectionLabel>תגובות בולטות</SectionLabel>
+                  <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
+                    {topic.key_reactions.map((r, i) => (
+                      <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                        <span style={{
+                          color: T.gold, fontSize: 12, fontWeight: 700,
+                          marginTop: 1, flexShrink: 0,
+                        }}>◆</span>
+                        <span style={{ color: T.textDim, fontSize: 13, lineHeight: 1.6 }}>{r}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Top post link */}
+              {topic.top_post_url && (
+                <div>
+                  <SectionLabel>פוסט מוביל</SectionLabel>
+                  <a
+                    href={topic.top_post_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                      color: T.accentHi, fontSize: 12, fontWeight: 600,
+                      textDecoration: "none",
+                    }}
+                  >
+                    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                    פתח פוסט מוביל
+                  </a>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -143,7 +240,7 @@ function TopicRow({ topic, index, isOpen, onToggle }) {
   );
 }
 
-function ReportCard({ report, isOpen, onToggle, openTopics, onToggleTopic }) {
+function ReportCard({ report, isOpen, onToggle, openTopics, onToggleTopic, deepTopics, onToggleDeep }) {
   let topics = report.topics;
   if (typeof topics === "string") {
     try { topics = JSON.parse(topics); } catch { topics = []; }
@@ -220,7 +317,9 @@ function ReportCard({ report, isOpen, onToggle, openTopics, onToggleTopic }) {
                   topic={topic}
                   index={i}
                   isOpen={openTopics.has(key)}
+                  isDeep={deepTopics.has(key)}
                   onToggle={() => onToggleTopic(key)}
+                  onToggleDeep={() => onToggleDeep(key)}
                 />
               );
             })
@@ -232,7 +331,9 @@ function ReportCard({ report, isOpen, onToggle, openTopics, onToggleTopic }) {
 }
 
 async function generateReportForChannels(channels, apiKey) {
-  const channelList = channels.map(ch => `- ${ch.name} (@${ch.username}, קטגוריה: ${ch.category || "כללי"})`).join("\n");
+  const channelList = channels
+    .map(ch => `- ${ch.name} (@${ch.username}, קטגוריה: ${ch.category || "כללי"})`)
+    .join("\n");
 
   const prompt = `אתה מנתח קהילות Data/BI/AI/ML ישראליות בטלגרם.
 עליך לנתח ולסכם את התוכן האחרון מהערוצים הבאים:
@@ -240,15 +341,17 @@ ${channelList}
 
 בהתבסס על הנושאים הנפוצים בקהילות אלה, זהה את 5 הנושאים החמים ביותר.
 החזר JSON תקין בלבד — מערך של בדיוק 5 אובייקטים. ללא טקסט לפני או אחרי.
-כל אובייקט חייב לכלול:
+כל אובייקט חייב לכלול בדיוק את השדות הבאים:
 {
-  "title": "כותרת הנושא",
-  "summary": "תיאור 2-3 משפטים",
-  "posts_count": <מספר>,
+  "title": "כותרת הנושא בעברית",
+  "summary": "סיכום קצר של 1-2 משפטים",
+  "posts_count": <מספר שלם>,
   "trend": "עולה" | "יורד" | "יציב",
-  "top_post_url": null,
-  "weekly_posts_count": <מספר>,
-  "avg_views": <מספר>
+  "top_post_url": "https://t.me/channel/123 או null",
+  "weekly_posts_count": <מספר שלם>,
+  "avg_views": <מספר שלם>,
+  "discussion_points": ["נקודת דיון ספציפית 1", "נקודת דיון ספציפית 2", "נקודת דיון ספציפית 3"],
+  "key_reactions": ["תגובה/סנטימנט מרכזי 1", "תגובה/סנטימנט מרכזי 2"]
 }`;
 
   const resp = await fetch("/api/claude", {
@@ -257,7 +360,7 @@ ${channelList}
     body: JSON.stringify({
       apiKey,
       model: "claude-sonnet-4-6",
-      max_tokens: 2000,
+      max_tokens: 3000,
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -276,19 +379,18 @@ ${channelList}
 }
 
 export default function ReportsScreen() {
-  const [reports,      setReports]     = useState([]);
-  const [channels,     setChannels]    = useState([]);
-  const [loading,      setLoading]     = useState(true);
-  const [error,        setError]       = useState("");
-  const [toast,        setToast]       = useState("");
-  const [openReports,  setOpenReports] = useState(new Set());
-  const [openTopics,   setOpenTopics]  = useState(new Set());
-  const [running,      setRunning]     = useState(new Set());
-  const [runningAll,   setRunningAll]  = useState(false);
+  const [reports,     setReports]    = useState([]);
+  const [channels,    setChannels]   = useState([]);
+  const [loading,     setLoading]    = useState(true);
+  const [error,       setError]      = useState("");
+  const [toast,       setToast]      = useState("");
+  const [openReports, setOpenReports] = useState(new Set());
+  const [openTopics,  setOpenTopics]  = useState(new Set());
+  const [deepTopics,  setDeepTopics]  = useState(new Set());
+  const [running,     setRunning]    = useState(new Set());
+  const [runningAll,  setRunningAll] = useState(false);
 
-  useEffect(() => {
-    fetchAll();
-  }, []);
+  useEffect(() => { fetchAll(); }, []);
 
   const showToast = (msg, ms = 3000) => {
     setToast(msg);
@@ -302,8 +404,8 @@ export default function ReportsScreen() {
       supabase.from("digest_reports").select("*").order("created_at", { ascending: false }),
       supabase.from("telegram_channels").select("*").eq("is_active", true).order("name"),
     ]);
-    if (rErr) { setError(`שגיאה בטעינת דוחות: ${rErr.message}`); }
-    if (cErr) { setError(`שגיאה בטעינת ערוצים: ${cErr.message}`); }
+    if (rErr) setError(`שגיאה בטעינת דוחות: ${rErr.message}`);
+    if (cErr) setError(`שגיאה בטעינת ערוצים: ${cErr.message}`);
     setReports(rData || []);
     setChannels(cData || []);
     setLoading(false);
@@ -317,8 +419,22 @@ export default function ReportsScreen() {
     });
   };
 
+  // Toggling a topic closed also resets its deep state
   const toggleTopic = (key) => {
     setOpenTopics(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+        setDeepTopics(d => { const nd = new Set(d); nd.delete(key); return nd; });
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const toggleDeep = (key) => {
+    setDeepTopics(prev => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
@@ -372,7 +488,9 @@ export default function ReportsScreen() {
           background: "#14532d", border: `1px solid ${T.green}`,
           color: "#fff", borderRadius: 10, padding: "10px 20px",
           fontSize: 14, fontWeight: 600, zIndex: 2000,
-        }}>{toast}</div>
+        }}>
+          {toast}
+        </div>
       )}
 
       {/* Header */}
@@ -388,7 +506,8 @@ export default function ReportsScreen() {
             style={{
               background: runningAll ? T.muted : T.green,
               border: "none", color: "#fff",
-              borderRadius: 8, padding: "8px 16px", cursor: runningAll ? "not-allowed" : "pointer",
+              borderRadius: 8, padding: "8px 16px",
+              cursor: (runningAll || channels.length === 0) ? "not-allowed" : "pointer",
               fontSize: 13, fontWeight: 700,
               opacity: (runningAll || channels.length === 0) ? 0.6 : 1,
               transition: "opacity .2s",
@@ -405,11 +524,12 @@ export default function ReportsScreen() {
           background: "#7f1d1d44", border: `1px solid ${T.red}66`,
           borderRadius: 8, padding: "10px 14px", marginBottom: 16,
           color: "#fca5a5", fontSize: 13,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          ⚠️ {error}
+          <span>⚠️ {error}</span>
           <button
             onClick={() => setError("")}
-            style={{ marginRight: 10, background: "none", border: "none", color: "#fca5a5", cursor: "pointer", fontSize: 13 }}
+            style={{ background: "none", border: "none", color: "#fca5a5", cursor: "pointer", fontSize: 14, padding: 0 }}
           >
             ✕
           </button>
@@ -466,7 +586,8 @@ export default function ReportsScreen() {
                   style={{
                     background: isRunning ? T.muted : T.accent,
                     border: "none", color: "#fff",
-                    borderRadius: 7, padding: "5px 12px", cursor: isRunning ? "not-allowed" : "pointer",
+                    borderRadius: 7, padding: "5px 12px",
+                    cursor: isRunning ? "not-allowed" : "pointer",
                     fontSize: 12, fontWeight: 700, flexShrink: 0,
                     opacity: isRunning ? 0.6 : 1, transition: "opacity .2s",
                   }}
@@ -479,7 +600,7 @@ export default function ReportsScreen() {
         </div>
       )}
 
-      {/* Reports loading */}
+      {/* Loading */}
       {loading && (
         <div style={{
           background: T.panel, border: `1px solid ${T.border}`,
@@ -510,6 +631,8 @@ export default function ReportsScreen() {
           onToggle={() => toggleReport(report.id)}
           openTopics={openTopics}
           onToggleTopic={toggleTopic}
+          deepTopics={deepTopics}
+          onToggleDeep={toggleDeep}
         />
       ))}
     </div>
