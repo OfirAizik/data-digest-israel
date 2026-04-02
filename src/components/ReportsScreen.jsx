@@ -37,7 +37,6 @@ function TrendBadge({ trend }) {
   );
 }
 
-// Chevron that rotates when open — pointerEvents:none so clicks reach the parent div
 function Chevron({ open }) {
   return (
     <svg
@@ -55,25 +54,19 @@ function Chevron({ open }) {
   );
 }
 
-function TopicRow({ topic, index }) {
-  const [open, setOpen] = useState(false);
-
+function TopicRow({ topic, index, isOpen, onToggle }) {
   return (
-    <div style={{
-      borderBottom: `1px solid ${T.border}`,
-    }}>
-      {/* Topic header — always visible */}
+    <div style={{ borderBottom: `1px solid ${T.border}` }}>
       <div
-        onClick={() => setOpen(v => !v)}
+        onClick={onToggle}
         style={{
           padding: "12px 20px", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 10,
-          background: open ? T.card + "80" : "transparent",
+          background: isOpen ? T.card + "80" : "transparent",
           transition: "background .15s",
           userSelect: "none",
         }}
       >
-        {/* Number bubble */}
         <span style={{
           background: T.accent + "33", color: T.accentHi,
           borderRadius: "50%", width: 22, height: 22, flexShrink: 0,
@@ -83,26 +76,20 @@ function TopicRow({ topic, index }) {
         }}>
           {index + 1}
         </span>
-
-        {/* Title + trend */}
         <span style={{ color: T.text, fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0, pointerEvents: "none" }}>
           {topic.title}
         </span>
         <TrendBadge trend={topic.trend} />
-        <Chevron open={open} />
+        <Chevron open={isOpen} />
       </div>
 
-      {/* Expanded topic details */}
-      {open && (
+      {isOpen && (
         <div style={{ padding: "12px 20px 16px 52px", background: T.card + "40" }}>
-          {/* Summary */}
           {topic.summary && (
             <p style={{ color: T.textDim, fontSize: 13, lineHeight: 1.65, marginBottom: 12 }}>
               {topic.summary}
             </p>
           )}
-
-          {/* Stats row */}
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: topic.top_post_url ? 12 : 0 }}>
             {topic.posts_count != null && (
               <div>
@@ -131,8 +118,6 @@ function TopicRow({ topic, index }) {
               </div>
             )}
           </div>
-
-          {/* Top post link */}
           {topic.top_post_url && (
             <a
               href={topic.top_post_url}
@@ -158,9 +143,7 @@ function TopicRow({ topic, index }) {
   );
 }
 
-function ReportCard({ report }) {
-  const [open, setOpen] = useState(false);
-
+function ReportCard({ report, isOpen, onToggle, openTopics, onToggleTopic }) {
   let topics = report.topics;
   if (typeof topics === "string") {
     try { topics = JSON.parse(topics); } catch { topics = []; }
@@ -170,7 +153,6 @@ function ReportCard({ report }) {
   const dateLabel = report.report_date
     ? new Date(report.report_date).toLocaleDateString("he-IL", { year: "numeric", month: "long", day: "numeric" })
     : "—";
-
   const createdLabel = report.created_at
     ? new Date(report.created_at).toLocaleString("he-IL")
     : "";
@@ -180,27 +162,23 @@ function ReportCard({ report }) {
       background: T.panel, border: `1px solid ${T.border}`,
       borderRadius: 14, overflow: "hidden", marginBottom: 14,
     }}>
-      {/* Collapsed header */}
       <div
-        onClick={() => setOpen(v => !v)}
+        onClick={onToggle}
         style={{
           padding: "16px 20px", cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: 12, background: open ? T.card + "50" : "transparent",
+          gap: 12, background: isOpen ? T.card + "50" : "transparent",
           transition: "background .15s",
           userSelect: "none",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          {/* Date */}
           <div>
             <div style={{ color: T.text, fontSize: 14, fontWeight: 700 }}>{dateLabel}</div>
             {createdLabel && (
               <div style={{ color: T.textFaint, fontSize: 11, marginTop: 2 }}>נוצר: {createdLabel}</div>
             )}
           </div>
-
-          {/* Source */}
           <span style={{
             background: T.accentHi + "18", color: T.accentHi,
             border: `1px solid ${T.accentHi}33`,
@@ -209,8 +187,6 @@ function ReportCard({ report }) {
           }}>
             📡 {report.source || "—"}
           </span>
-
-          {/* total_posts */}
           <span style={{
             background: T.card, border: `1px solid ${T.border}`,
             borderRadius: 6, padding: "3px 9px", color: T.textDim, fontSize: 12, fontWeight: 600,
@@ -218,8 +194,6 @@ function ReportCard({ report }) {
           }}>
             {report.total_posts ?? "—"} פוסטים
           </span>
-
-          {/* topics count */}
           <span style={{
             background: T.card, border: `1px solid ${T.border}`,
             borderRadius: 6, padding: "3px 9px", color: T.textFaint, fontSize: 12,
@@ -228,21 +202,28 @@ function ReportCard({ report }) {
             {topics.length} נושאים
           </span>
         </div>
-
-        <Chevron open={open} />
+        <Chevron open={isOpen} />
       </div>
 
-      {/* Topics list */}
-      {open && (
+      {isOpen && (
         <div style={{ borderTop: `1px solid ${T.border}` }}>
           {topics.length === 0 ? (
             <div style={{ padding: 24, textAlign: "center", color: T.textDim, fontSize: 13 }}>
               אין נושאים בדוח זה.
             </div>
           ) : (
-            topics.map((topic, i) => (
-              <TopicRow key={i} topic={topic} index={i} />
-            ))
+            topics.map((topic, i) => {
+              const key = `${report.id}-${i}`;
+              return (
+                <TopicRow
+                  key={i}
+                  topic={topic}
+                  index={i}
+                  isOpen={openTopics.has(key)}
+                  onToggle={() => onToggleTopic(key)}
+                />
+              );
+            })
           )}
         </div>
       )}
@@ -250,34 +231,175 @@ function ReportCard({ report }) {
   );
 }
 
+async function generateReportForChannels(channels, apiKey) {
+  const channelList = channels.map(ch => `- ${ch.name} (@${ch.username}, קטגוריה: ${ch.category || "כללי"})`).join("\n");
+
+  const prompt = `אתה מנתח קהילות Data/BI/AI/ML ישראליות בטלגרם.
+עליך לנתח ולסכם את התוכן האחרון מהערוצים הבאים:
+${channelList}
+
+בהתבסס על הנושאים הנפוצים בקהילות אלה, זהה את 5 הנושאים החמים ביותר.
+החזר JSON תקין בלבד — מערך של בדיוק 5 אובייקטים. ללא טקסט לפני או אחרי.
+כל אובייקט חייב לכלול:
+{
+  "title": "כותרת הנושא",
+  "summary": "תיאור 2-3 משפטים",
+  "posts_count": <מספר>,
+  "trend": "עולה" | "יורד" | "יציב",
+  "top_post_url": null,
+  "weekly_posts_count": <מספר>,
+  "avg_views": <מספר>
+}`;
+
+  const resp = await fetch("/api/claude", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      apiKey,
+      model: "claude-sonnet-4-6",
+      max_tokens: 2000,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+  }
+
+  const data = await resp.json();
+  const text = data?.content?.[0]?.text;
+  if (!text) throw new Error("תגובה לא תקינה מ-Claude");
+
+  const raw = text.replace(/```json\n?|```/g, "").trim();
+  return JSON.parse(raw);
+}
+
 export default function ReportsScreen() {
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState("");
+  const [reports,      setReports]     = useState([]);
+  const [channels,     setChannels]    = useState([]);
+  const [loading,      setLoading]     = useState(true);
+  const [error,        setError]       = useState("");
+  const [toast,        setToast]       = useState("");
+  const [openReports,  setOpenReports] = useState(new Set());
+  const [openTopics,   setOpenTopics]  = useState(new Set());
+  const [running,      setRunning]     = useState(new Set());
+  const [runningAll,   setRunningAll]  = useState(false);
 
-  useEffect(() => { fetchReports(); }, []);
+  useEffect(() => {
+    fetchAll();
+  }, []);
 
-  const fetchReports = async () => {
+  const showToast = (msg, ms = 3000) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), ms);
+  };
+
+  const fetchAll = async () => {
     setLoading(true);
     setError("");
-    const { data, error: err } = await supabase
-      .from("digest_reports")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (err) { setError(`שגיאה בטעינת דוחות: ${err.message}`); setLoading(false); return; }
-    setReports(data || []);
+    const [{ data: rData, error: rErr }, { data: cData, error: cErr }] = await Promise.all([
+      supabase.from("digest_reports").select("*").order("created_at", { ascending: false }),
+      supabase.from("telegram_channels").select("*").eq("is_active", true).order("name"),
+    ]);
+    if (rErr) { setError(`שגיאה בטעינת דוחות: ${rErr.message}`); }
+    if (cErr) { setError(`שגיאה בטעינת ערוצים: ${cErr.message}`); }
+    setReports(rData || []);
+    setChannels(cData || []);
     setLoading(false);
+  };
+
+  const toggleReport = (id) => {
+    setOpenReports(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleTopic = (key) => {
+    setOpenTopics(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  const runReport = async (channelsToRun) => {
+    const apiKey = typeof window !== "undefined" ? localStorage.getItem("digest_claude_key") : null;
+    if (!apiKey) {
+      setError("מפתח Claude API חסר. הגדר אותו בהגדרות.");
+      return;
+    }
+
+    const ids = channelsToRun.map(ch => ch.id);
+    setRunning(prev => { const next = new Set(prev); ids.forEach(id => next.add(id)); return next; });
+
+    try {
+      const topics = await generateReportForChannels(channelsToRun, apiKey);
+      const sourceNames = channelsToRun.map(ch => ch.username).join(", ");
+      const { error: insertErr } = await supabase.from("digest_reports").insert({
+        report_date: new Date().toISOString().split("T")[0],
+        source: sourceNames,
+        total_posts: topics.reduce((sum, t) => sum + (t.posts_count || 0), 0),
+        topics: JSON.stringify(topics),
+      });
+      if (insertErr) throw new Error(insertErr.message);
+      showToast(`✅ דוח נוצר בהצלחה עבור: ${sourceNames}`);
+      await fetchAll();
+    } catch (err) {
+      setError(`שגיאה ביצירת דוח: ${err.message}`);
+    } finally {
+      setRunning(prev => { const next = new Set(prev); ids.forEach(id => next.delete(id)); return next; });
+    }
+  };
+
+  const runSingleChannel = (ch) => runReport([ch]);
+
+  const runAllChannels = async () => {
+    if (channels.length === 0) return;
+    setRunningAll(true);
+    await runReport(channels);
+    setRunningAll(false);
   };
 
   return (
     <div style={{ direction: "rtl" }}>
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
+          background: "#14532d", border: `1px solid ${T.green}`,
+          color: "#fff", borderRadius: 10, padding: "10px 20px",
+          fontSize: 14, fontWeight: 600, zIndex: 2000,
+        }}>{toast}</div>
+      )}
+
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <h3 style={{ color: T.text, fontSize: 16, fontWeight: 700 }}>📊 דוחות</h3>
-        {!loading && (
-          <span style={{ color: T.textFaint, fontSize: 13 }}>{reports.length} דוחות</span>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {!loading && (
+            <span style={{ color: T.textFaint, fontSize: 13 }}>{reports.length} דוחות</span>
+          )}
+          <button
+            onClick={runAllChannels}
+            disabled={runningAll || channels.length === 0}
+            style={{
+              background: runningAll ? T.muted : T.green,
+              border: "none", color: "#fff",
+              borderRadius: 8, padding: "8px 16px", cursor: runningAll ? "not-allowed" : "pointer",
+              fontSize: 13, fontWeight: 700,
+              opacity: (runningAll || channels.length === 0) ? 0.6 : 1,
+              transition: "opacity .2s",
+            }}
+          >
+            {runningAll ? "מריץ..." : "▶ הרץ את כל הדוחות"}
+          </button>
+        </div>
       </div>
 
+      {/* Error */}
       {error && (
         <div style={{
           background: "#7f1d1d44", border: `1px solid ${T.red}66`,
@@ -285,9 +407,79 @@ export default function ReportsScreen() {
           color: "#fca5a5", fontSize: 13,
         }}>
           ⚠️ {error}
+          <button
+            onClick={() => setError("")}
+            style={{ marginRight: 10, background: "none", border: "none", color: "#fca5a5", cursor: "pointer", fontSize: 13 }}
+          >
+            ✕
+          </button>
         </div>
       )}
 
+      {/* Active channels */}
+      {!loading && channels.length > 0 && (
+        <div style={{
+          background: T.panel, border: `1px solid ${T.border}`,
+          borderRadius: 14, overflow: "hidden", marginBottom: 24,
+        }}>
+          <div style={{
+            padding: "10px 16px", background: T.card,
+            borderBottom: `1px solid ${T.border}`,
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <span style={{ color: T.textFaint, fontSize: 11, fontWeight: 700, letterSpacing: "0.05em" }}>
+              ערוצים פעילים
+            </span>
+            <span style={{
+              background: T.green + "22", color: T.green, border: `1px solid ${T.green}44`,
+              borderRadius: 10, padding: "1px 7px", fontSize: 11, fontWeight: 700,
+            }}>
+              {channels.length}
+            </span>
+          </div>
+          {channels.map((ch, i) => {
+            const isRunning = running.has(ch.id) || runningAll;
+            return (
+              <div key={ch.id} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "10px 16px", gap: 12,
+                background: i % 2 === 0 ? T.panel : T.card + "80",
+                borderBottom: i < channels.length - 1 ? `1px solid ${T.border}` : "none",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                  <span style={{ color: T.text, fontSize: 13, fontWeight: 600 }}>{ch.name}</span>
+                  <span style={{ color: T.accentHi, fontSize: 12, fontFamily: "monospace", direction: "ltr" }}>
+                    @{ch.username}
+                  </span>
+                  {ch.category && (
+                    <span style={{
+                      background: T.card, border: `1px solid ${T.border}`,
+                      borderRadius: 6, padding: "1px 7px", color: T.textDim, fontSize: 11,
+                    }}>
+                      {ch.category}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => runSingleChannel(ch)}
+                  disabled={isRunning}
+                  style={{
+                    background: isRunning ? T.muted : T.accent,
+                    border: "none", color: "#fff",
+                    borderRadius: 7, padding: "5px 12px", cursor: isRunning ? "not-allowed" : "pointer",
+                    fontSize: 12, fontWeight: 700, flexShrink: 0,
+                    opacity: isRunning ? 0.6 : 1, transition: "opacity .2s",
+                  }}
+                >
+                  {isRunning ? "מריץ..." : "הרץ דוח"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Reports loading */}
       {loading && (
         <div style={{
           background: T.panel, border: `1px solid ${T.border}`,
@@ -297,6 +489,7 @@ export default function ReportsScreen() {
         </div>
       )}
 
+      {/* Empty state */}
       {!loading && reports.length === 0 && (
         <div style={{
           background: T.panel, border: `1px solid ${T.border}`,
@@ -304,12 +497,20 @@ export default function ReportsScreen() {
         }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>
           <div style={{ color: T.text, fontSize: 15, fontWeight: 700, marginBottom: 8 }}>אין דוחות עדיין</div>
-          <div style={{ color: T.textDim, fontSize: 13 }}>הרץ את הסקרייפר כדי ליצור את הדוח הראשון.</div>
+          <div style={{ color: T.textDim, fontSize: 13 }}>הרץ דוח כדי ליצור את הדוח הראשון.</div>
         </div>
       )}
 
+      {/* Reports list */}
       {!loading && reports.map(report => (
-        <ReportCard key={report.id} report={report} />
+        <ReportCard
+          key={report.id}
+          report={report}
+          isOpen={openReports.has(report.id)}
+          onToggle={() => toggleReport(report.id)}
+          openTopics={openTopics}
+          onToggleTopic={toggleTopic}
+        />
       ))}
     </div>
   );
