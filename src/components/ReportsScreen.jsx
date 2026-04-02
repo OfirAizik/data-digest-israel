@@ -71,7 +71,9 @@ function SectionLabel({ children }) {
 //   Level 2 (isOpen=true, isDeep=false): summary + stats + "הצג עומק" button
 //   Level 3 (isOpen=true, isDeep=true):  + discussion points + key reactions + top post link
 function TopicRow({ topic, index, isOpen, isDeep, onToggle, onToggleDeep }) {
-  const hasDepth = (topic.discussion_points?.length > 0) || (topic.key_reactions?.length > 0);
+  const hasDiscussion = Array.isArray(topic.discussion_points) && topic.discussion_points.length > 0;
+  const hasReactions  = Array.isArray(topic.key_reactions)    && topic.key_reactions.length > 0;
+  const topPostUrl    = topic.top_post_url && topic.top_post_url !== "null" ? topic.top_post_url : null;
 
   return (
     <div style={{ borderBottom: `1px solid ${T.border}` }}>
@@ -147,9 +149,8 @@ function TopicRow({ topic, index, isOpen, isDeep, onToggle, onToggleDeep }) {
             )}
           </div>
 
-          {/* "הצג עומק" toggle button */}
-          {hasDepth && (
-            <button
+          {/* "הצג עומק" toggle button — always shown at level 2 */}
+          <button
               onClick={(e) => { e.stopPropagation(); onToggleDeep(); }}
               style={{
                 background: isDeep ? T.card : T.accent + "22",
@@ -161,8 +162,7 @@ function TopicRow({ topic, index, isOpen, isDeep, onToggle, onToggleDeep }) {
               }}
             >
               {isDeep ? "▲ הסתר עומק" : "▼ הצג עומק"}
-            </button>
-          )}
+          </button>
 
           {/* ── Level 3: deep analysis ── */}
           {isDeep && (
@@ -172,17 +172,26 @@ function TopicRow({ topic, index, isOpen, isDeep, onToggle, onToggleDeep }) {
               paddingTop: 16,
               display: "flex", flexDirection: "column", gap: 16,
             }}>
+              {/* Fallback for old reports without deep data */}
+              {!hasDiscussion && !hasReactions && !topPostUrl && (
+                <div style={{
+                  color: T.textFaint, fontSize: 12, fontStyle: "italic",
+                  padding: "8px 12px",
+                  background: T.card, borderRadius: 8,
+                  border: `1px solid ${T.border}`,
+                }}>
+                  הרץ דוח חדש כדי לראות ניתוח מעמיק
+                </div>
+              )}
+
               {/* Discussion points */}
-              {topic.discussion_points?.length > 0 && (
+              {hasDiscussion && (
                 <div>
                   <SectionLabel>נקודות דיון מרכזיות</SectionLabel>
                   <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
                     {topic.discussion_points.map((pt, i) => (
                       <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                        <span style={{
-                          color: T.accentHi, fontSize: 12, fontWeight: 700,
-                          marginTop: 1, flexShrink: 0,
-                        }}>•</span>
+                        <span style={{ color: T.accentHi, fontSize: 12, fontWeight: 700, marginTop: 1, flexShrink: 0 }}>•</span>
                         <span style={{ color: T.textDim, fontSize: 13, lineHeight: 1.6 }}>{pt}</span>
                       </li>
                     ))}
@@ -191,16 +200,13 @@ function TopicRow({ topic, index, isOpen, isDeep, onToggle, onToggleDeep }) {
               )}
 
               {/* Key reactions */}
-              {topic.key_reactions?.length > 0 && (
+              {hasReactions && (
                 <div>
                   <SectionLabel>תגובות בולטות</SectionLabel>
                   <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
                     {topic.key_reactions.map((r, i) => (
                       <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                        <span style={{
-                          color: T.gold, fontSize: 12, fontWeight: 700,
-                          marginTop: 1, flexShrink: 0,
-                        }}>◆</span>
+                        <span style={{ color: T.gold, fontSize: 12, fontWeight: 700, marginTop: 1, flexShrink: 0 }}>◆</span>
                         <span style={{ color: T.textDim, fontSize: 13, lineHeight: 1.6 }}>{r}</span>
                       </li>
                     ))}
@@ -209,11 +215,11 @@ function TopicRow({ topic, index, isOpen, isDeep, onToggle, onToggleDeep }) {
               )}
 
               {/* Top post link */}
-              {topic.top_post_url && (
+              {topPostUrl && (
                 <div>
                   <SectionLabel>פוסט מוביל</SectionLabel>
                   <a
-                    href={topic.top_post_url}
+                    href={topPostUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
