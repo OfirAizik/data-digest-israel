@@ -1,0 +1,16 @@
+{
+  "messages_limit": 100,
+  "topics_per_category": 5,
+  "schedule": {
+    "mode": "interval",
+    "interval_days": 2,
+    "specific_days": [],
+    "specific_dates": [],
+    "run_time": "08:00"
+  },
+  "email": {
+    "gmail_user": "",
+    "gmail_app_password": "",
+    "recipients": []
+  }
+}

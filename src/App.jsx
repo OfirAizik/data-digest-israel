@@ -587,72 +587,245 @@ const ReportViewer = ({ report, onClose }) => {
 };
 
 /* ─── Settings Panel ──────────────────────────────────────── */
-const SettingsPanel = ({ cfg, onChange }) => {
-  const set = (k, v) => onChange({ ...cfg, [k]: v });
-  const Field = ({ label, k, type = "text", placeholder = "" }) => (
-    <div style={{ marginBottom: 14 }}>
-      <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>{label}</label>
-      <input
-        type={type}
-        value={cfg[k] || ""}
-        onChange={e => set(k, e.target.value)}
-        placeholder={placeholder}
-        style={{
-          width: "100%", boxSizing: "border-box",
-          background: T.card, border: `1px solid ${T.border}`, borderRadius: 8,
-          padding: "9px 12px", color: T.text, fontSize: 13, outline: "none",
-          fontFamily: type === "password" ? "monospace" : "inherit",
-        }}
-      />
-    </div>
-  );
+const DAYS_HE = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
+const SettingsPanel = ({ claudeKey, onClaudeKeyChange }) => {
+  const [s, setS] = useState({
+    messages_limit: 100,
+    topics_per_category: 5,
+    schedule_mode: "interval",
+    interval_days: 2,
+    specific_days: [],
+    specific_dates: [],
+    run_time: "08:00",
+    gmail_user: "",
+    gmail_pass: "",
+    recipients: "",
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [toast, setToast]     = useState("");
+  const [newDate, setNewDate] = useState("");
+
+  useEffect(() => {
+    supabase.from("app_config").select("key, value").then(({ data }) => {
+      if (data && data.length > 0) {
+        const map = Object.fromEntries(data.map(r => [r.key, r.value]));
+        setS(prev => ({
+          ...prev,
+          messages_limit:      map.messages_limit      ? +map.messages_limit      : prev.messages_limit,
+          topics_per_category: map.topics_per_category ? +map.topics_per_category : prev.topics_per_category,
+          schedule_mode:       map.schedule_mode       || prev.schedule_mode,
+          interval_days:       map.interval_days       ? +map.interval_days       : prev.interval_days,
+          specific_days:       map.specific_days       ? JSON.parse(map.specific_days)  : prev.specific_days,
+          specific_dates:      map.specific_dates      ? JSON.parse(map.specific_dates) : prev.specific_dates,
+          run_time:            map.run_time            || prev.run_time,
+          gmail_user:          map.gmail_user          || prev.gmail_user,
+          gmail_pass:          map.gmail_pass          || prev.gmail_pass,
+          recipients:          map.recipients          || prev.recipients,
+        }));
+      }
+      setLoading(false);
+    });
+  }, []);
+
+  const set = (k, v) => setS(prev => ({ ...prev, [k]: v }));
+
+  const toggleDay = (i) => {
+    set("specific_days", s.specific_days.includes(i)
+      ? s.specific_days.filter(d => d !== i)
+      : [...s.specific_days, i].sort((a, b) => a - b)
+    );
+  };
+
+  const addDate = () => {
+    if (!newDate || s.specific_dates.includes(newDate)) return;
+    set("specific_dates", [...s.specific_dates, newDate].sort());
+    setNewDate("");
+  };
+
+  const removeDate = (d) => set("specific_dates", s.specific_dates.filter(x => x !== d));
+
+  const save = async () => {
+    setSaving(true);
+    const rows = [
+      { key: "messages_limit",      value: String(s.messages_limit) },
+      { key: "topics_per_category", value: String(s.topics_per_category) },
+      { key: "schedule_mode",       value: s.schedule_mode },
+      { key: "interval_days",       value: String(s.interval_days) },
+      { key: "specific_days",       value: JSON.stringify(s.specific_days) },
+      { key: "specific_dates",      value: JSON.stringify(s.specific_dates) },
+      { key: "run_time",            value: s.run_time },
+      { key: "gmail_user",          value: s.gmail_user },
+      { key: "gmail_pass",          value: s.gmail_pass },
+      { key: "recipients",          value: s.recipients },
+    ];
+    const { error } = await supabase.from("app_config").upsert(rows, { onConflict: "key" });
+    setSaving(false);
+    if (error) { setToast(`❌ שגיאה: ${error.message}`); setTimeout(() => setToast(""), 3000); }
+    else        { setToast("✅ הגדרות נשמרו");            setTimeout(() => setToast(""), 3000); }
+  };
+
+  if (loading) return <div style={{ color: T.textDim, padding: 40, textAlign: "center" }}>טוען הגדרות...</div>;
+
+  const inp = {
+    width: "100%", boxSizing: "border-box",
+    background: T.panel, border: `1px solid ${T.border}`, borderRadius: 8,
+    padding: "9px 12px", color: T.text, fontSize: 13, outline: "none",
+  };
 
   return (
     <div style={{ direction: "rtl" }}>
       <h3 style={{ color: T.text, fontSize: 15, fontWeight: 700, marginBottom: 20 }}>⚙️ הגדרות מערכת</h3>
 
+      {toast && (
+        <div style={{
+          position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)",
+          background: toast.startsWith("✅") ? "#14532d" : "#7f1d1d",
+          border: `1px solid ${toast.startsWith("✅") ? T.green : T.red}`,
+          color: "#fff", borderRadius: 10, padding: "10px 20px",
+          fontSize: 14, fontWeight: 600, zIndex: 2000,
+        }}>{toast}</div>
+      )}
+
+      {/* Claude API */}
       <div style={{ background: T.card, borderRadius: 12, padding: 20, marginBottom: 16, border: `1px solid ${T.border}` }}>
         <h4 style={{ color: T.accentHi, margin: "0 0 16px", fontSize: 13, fontWeight: 700 }}>🤖 Claude API</h4>
-        <Field label="Claude API Key" k="claudeKey" type="password" placeholder="sk-ant-..." />
-        <div style={{ background: T.panel, borderRadius: 8, padding: 10, fontSize: 12, color: T.textDim }}>
+        <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>Claude API Key</label>
+        <input type="password" value={claudeKey} onChange={e => onClaudeKeyChange(e.target.value)}
+          placeholder="sk-ant-..." style={{ ...inp, fontFamily: "monospace" }} />
+        <div style={{ background: T.panel, borderRadius: 8, padding: 10, fontSize: 12, color: T.textDim, marginTop: 10 }}>
           💡 קבל API key ב: <a href="https://console.anthropic.com" target="_blank" style={{ color: T.accentHi }}>console.anthropic.com</a>
         </div>
       </div>
 
+      {/* Scraper */}
       <div style={{ background: T.card, borderRadius: 12, padding: 20, marginBottom: 16, border: `1px solid ${T.border}` }}>
-        <h4 style={{ color: "#10b981", margin: "0 0 16px", fontSize: 13, fontWeight: 700 }}>📧 שליחת מייל (Gmail)</h4>
-        <Field label="כתובת Gmail" k="gmailUser" placeholder="your@gmail.com" />
-        <Field label="App Password (16 תווים)" k="gmailPass" type="password" placeholder="xxxx xxxx xxxx xxxx" />
-        <Field label="נמענים (מופרדים בפסיק)" k="recipients" placeholder="you@gmail.com, colleague@gmail.com" />
+        <h4 style={{ color: T.gold, margin: "0 0 16px", fontSize: 13, fontWeight: 700 }}>🔍 הגדרות סריקה</h4>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div>
+            <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>מגבלת הודעות לסריקה (50–500)</label>
+            <input type="number" min={50} max={500} value={s.messages_limit}
+              onChange={e => set("messages_limit", +e.target.value)} style={inp} />
+          </div>
+          <div>
+            <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>נושאים לקטגוריה (3–10)</label>
+            <input type="number" min={3} max={10} value={s.topics_per_category}
+              onChange={e => set("topics_per_category", +e.target.value)} style={inp} />
+          </div>
+        </div>
+      </div>
+
+      {/* Schedule */}
+      <div style={{ background: T.card, borderRadius: 12, padding: 20, marginBottom: 16, border: `1px solid ${T.border}` }}>
+        <h4 style={{ color: T.green, margin: "0 0 16px", fontSize: 13, fontWeight: 700 }}>🗓️ תזמון הרצות</h4>
+        <div style={{ display: "flex", gap: 20, marginBottom: 16, flexWrap: "wrap" }}>
+          {[
+            { value: "interval",       label: "כל X ימים"           },
+            { value: "specific_days",  label: "ימים ספציפיים בשבוע" },
+            { value: "specific_dates", label: "תאריכים ייעודיים"     },
+          ].map(opt => (
+            <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: T.textDim, fontSize: 13 }}>
+              <input type="radio" name="schedule_mode" value={opt.value}
+                checked={s.schedule_mode === opt.value}
+                onChange={() => set("schedule_mode", opt.value)}
+                style={{ accentColor: T.green }} />
+              {opt.label}
+            </label>
+          ))}
+        </div>
+
+        {s.schedule_mode === "interval" && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>מספר ימים בין הרצות (1–14)</label>
+            <input type="number" min={1} max={14} value={s.interval_days}
+              onChange={e => set("interval_days", +e.target.value)}
+              style={{ ...inp, width: 120 }} />
+          </div>
+        )}
+
+        {s.schedule_mode === "specific_days" && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 8 }}>בחר ימים</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {DAYS_HE.map((day, i) => (
+                <button key={i} onClick={() => toggleDay(i)} style={{
+                  background: s.specific_days.includes(i) ? T.green + "33" : T.panel,
+                  border: `1px solid ${s.specific_days.includes(i) ? T.green : T.border}`,
+                  color: s.specific_days.includes(i) ? T.green : T.textDim,
+                  borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                }}>{day}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {s.schedule_mode === "specific_dates" && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 8 }}>הוסף תאריכים</label>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center" }}>
+              <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)}
+                style={{ ...inp, width: "auto", colorScheme: "dark" }} />
+              <button onClick={addDate} style={{
+                background: T.accent, border: "none", color: "#fff",
+                borderRadius: 8, padding: "9px 16px", cursor: "pointer", fontSize: 13, fontWeight: 700,
+              }}>הוסף</button>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {s.specific_dates.map(d => (
+                <span key={d} style={{
+                  background: T.panel, border: `1px solid ${T.border}`,
+                  borderRadius: 8, padding: "4px 10px", fontSize: 12, color: T.textDim,
+                  display: "flex", alignItems: "center", gap: 6,
+                }}>
+                  {d}
+                  <button onClick={() => removeDate(d)} style={{
+                    background: "none", border: "none", color: T.red,
+                    cursor: "pointer", fontSize: 14, padding: 0, lineHeight: 1,
+                  }}>×</button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>שעת הרצה</label>
+          <input type="time" value={s.run_time} onChange={e => set("run_time", e.target.value)}
+            style={{ ...inp, width: "auto", colorScheme: "dark" }} />
+        </div>
+      </div>
+
+      {/* Email */}
+      <div style={{ background: T.card, borderRadius: 12, padding: 20, marginBottom: 20, border: `1px solid ${T.border}` }}>
+        <h4 style={{ color: T.green, margin: "0 0 16px", fontSize: 13, fontWeight: 700 }}>📧 שליחת מייל (Gmail)</h4>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>כתובת Gmail</label>
+          <input value={s.gmail_user} onChange={e => set("gmail_user", e.target.value)}
+            placeholder="your@gmail.com" style={inp} />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>App Password (16 תווים)</label>
+          <input type="password" value={s.gmail_pass} onChange={e => set("gmail_pass", e.target.value)}
+            placeholder="xxxx xxxx xxxx xxxx" style={{ ...inp, fontFamily: "monospace" }} />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>נמענים (מופרדים בפסיק)</label>
+          <input value={s.recipients} onChange={e => set("recipients", e.target.value)}
+            placeholder="you@gmail.com, colleague@gmail.com" style={inp} />
+        </div>
         <div style={{ background: T.panel, borderRadius: 8, padding: 10, fontSize: 12, color: T.textDim }}>
           💡 צור App Password ב: <a href="https://myaccount.google.com/apppasswords" target="_blank" style={{ color: T.accentHi }}>myaccount.google.com/apppasswords</a>
         </div>
       </div>
 
-      <div style={{ background: T.card, borderRadius: 12, padding: 20, border: `1px solid ${T.border}` }}>
-        <h4 style={{ color: T.gold, margin: "0 0 16px", fontSize: 13, fontWeight: 700 }}>🗓️ תדירות הדוח</h4>
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>
-            סריקה כל {cfg.intervalDays || 2} ימים
-          </label>
-          <input type="range" min={1} max={7} value={cfg.intervalDays || 2}
-            onChange={e => set("intervalDays", +e.target.value)}
-            style={{ width: "100%", accentColor: T.gold }}
-          />
-          <div style={{ display: "flex", justifyContent: "space-between", color: T.textFaint, fontSize: 11, marginTop: 2 }}>
-            <span>כל יום</span><span>שבועי</span>
-          </div>
-        </div>
-        <div style={{ marginBottom: 0 }}>
-          <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>
-            נושאים לקטגוריה: {cfg.topicsPerCat || 4}
-          </label>
-          <input type="range" min={2} max={8} value={cfg.topicsPerCat || 4}
-            onChange={e => set("topicsPerCat", +e.target.value)}
-            style={{ width: "100%", accentColor: T.gold }}
-          />
-        </div>
-      </div>
+      <button onClick={save} disabled={saving} style={{
+        background: T.accent, border: "none", color: "#fff",
+        borderRadius: 10, padding: "11px 24px", cursor: saving ? "not-allowed" : "pointer",
+        fontSize: 14, fontWeight: 700, opacity: saving ? 0.7 : 1,
+      }}>
+        {saving ? "שומר..." : "💾 שמור הגדרות"}
+      </button>
     </div>
   );
 };
@@ -664,8 +837,6 @@ export default function App() {
   const [tab, setTab]         = useState("sources");   // sources | settings
   const [sources, setSources] = useState(DEFAULT_SOURCES);
   const [cfg, setCfg]         = useState(() => ({
-    intervalDays: 2,
-    topicsPerCat: 4,
     claudeKey: typeof window !== "undefined" ? (localStorage.getItem("digest_claude_key") || "") : "",
   }));
   const [modal, setModal]     = useState(null);        // null | "add" | source_obj
@@ -759,7 +930,7 @@ export default function App() {
       await new Promise(r => setTimeout(r, 800));
 
       setProgress("שולח ל-Claude API לסיכום...");
-      const { result, usage } = await callClaude(cfg.claudeKey, sources, cfg.intervalDays || 2);
+      const { result, usage } = await callClaude(cfg.claudeKey, sources, 2);
 
       setReport(result);
       showToast("✅ דוח נוצר בהצלחה!", "ok");
@@ -1169,17 +1340,10 @@ export default function App() {
         {/* ── SETTINGS TAB ────────────────────────────────── */}
         {tab === "settings" && (
           <div style={{ maxWidth: 600 }}>
-            <SettingsPanel cfg={cfg} onChange={setCfg}/>
-            <button
-              onClick={() => { showToast("✅ הגדרות נשמרו", "ok"); }}
-              style={{
-                marginTop: 20, background: T.accent, border: "none", color: "#fff",
-                borderRadius: 10, padding: "11px 24px", cursor: "pointer",
-                fontSize: 14, fontWeight: 700,
-              }}
-            >
-              💾 שמור הגדרות
-            </button>
+            <SettingsPanel
+              claudeKey={cfg.claudeKey}
+              onClaudeKeyChange={v => setCfg(prev => ({ ...prev, claudeKey: v }))}
+            />
           </div>
         )}
 
