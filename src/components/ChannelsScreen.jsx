@@ -55,7 +55,7 @@ const PlatformBadge = ({ platform }) => {
   );
 };
 
-const EMPTY_FORM = { name: "", username: "", category: "", is_active: true, is_member: false, notes: "" };
+const EMPTY_FORM = { name: "", username: "", category: "", members_count: "", is_active: true, is_member: false, notes: "" };
 
 const FALLBACK_SUGGESTED = [
   { name: "Machine & Deep Learning Israel", username: "MDLI1",             category: "ML/DL/AI",  platform: "telegram" },
@@ -144,12 +144,13 @@ export default function ChannelsScreen({ isAdmin }) {
     if (!form.name.trim() || !form.username.trim()) return;
     setSubmitting(true);
     const { error: err } = await supabase.from("telegram_channels").insert({
-      name:      form.name.trim(),
-      username:  form.username.trim(),
-      category:  form.category.trim() || null,
-      is_active: form.is_active,
-      is_member: form.is_member,
-      notes:     form.notes.trim() || null,
+      name:          form.name.trim(),
+      username:      form.username.trim(),
+      category:      form.category.trim() || null,
+      members_count: form.members_count.trim() || null,
+      is_active:     form.is_active,
+      is_member:     form.is_member,
+      notes:         form.notes.trim() || null,
     });
     if (err) setError(`שגיאת הוספה: ${err.message}`);
     else {
@@ -173,14 +174,14 @@ export default function ChannelsScreen({ isAdmin }) {
 
   const startEdit = (ch) => {
     setEditId(ch.id);
-    setEditForm({ name: ch.name, category: ch.category || "", notes: ch.notes || "" });
+    setEditForm({ name: ch.name, category: ch.category || "", members_count: ch.members_count || "", notes: ch.notes || "" });
   };
 
   const saveEdit = async () => {
     setSaving(editId);
     const { error: err } = await supabase
       .from("telegram_channels")
-      .update({ name: editForm.name.trim(), category: editForm.category.trim() || null, notes: editForm.notes.trim() || null })
+      .update({ name: editForm.name.trim(), category: editForm.category.trim() || null, members_count: editForm.members_count.trim() || null, notes: editForm.notes.trim() || null })
       .eq("id", editId);
     if (err) setError(`שגיאת עדכון: ${err.message}`);
     else { showToast("✅ ערוץ עודכן"); fetchChannels(); }
@@ -197,8 +198,8 @@ export default function ChannelsScreen({ isAdmin }) {
   };
 
   const colTemplate = isAdmin
-    ? "2fr 1.3fr 1fr 1fr 70px 70px 1.5fr 88px"
-    : "2fr 1.3fr 1fr 1fr 70px 70px 1.5fr";
+    ? "2fr 1.3fr 1fr 1fr 80px 70px 70px 1.5fr 88px"
+    : "2fr 1.3fr 1fr 1fr 80px 70px 70px 1.5fr";
 
   return (
     <div style={{ direction: "rtl" }}>
@@ -250,10 +251,11 @@ export default function ChannelsScreen({ isAdmin }) {
           <h4 style={{ color: T.text, fontSize: 14, fontWeight: 700, marginBottom: 16 }}>הוספת ערוץ חדש</h4>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
             {[
-              { key: "name",     label: "שם *",         placeholder: "Machine & Deep Learning Israel", ltr: false },
-              { key: "username", label: "שם משתמש *",   placeholder: "MDLI1",                         ltr: true  },
-              { key: "category", label: "קטגוריה",      placeholder: "ML/DL/AI",                      ltr: false },
-              { key: "notes",    label: "הערות",        placeholder: "הערות אופציונליות",              ltr: false },
+              { key: "name",          label: "שם *",         placeholder: "Machine & Deep Learning Israel", ltr: false },
+              { key: "username",      label: "שם משתמש *",   placeholder: "MDLI1",                         ltr: true  },
+              { key: "category",      label: "קטגוריה",      placeholder: "ML/DL/AI",                      ltr: false },
+              { key: "members_count", label: "מספר חברים",   placeholder: "15K+",                          ltr: true  },
+              { key: "notes",         label: "הערות",        placeholder: "הערות אופציונליות",              ltr: false },
             ].map(f => (
               <div key={f.key}>
                 <label style={{ color: T.textDim, fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>
@@ -487,7 +489,7 @@ export default function ChannelsScreen({ isAdmin }) {
           padding: "10px 16px", background: T.card,
           borderBottom: `1px solid ${T.border}`,
         }}>
-          {["שם", "שם משתמש", "פלטפורמה", "קטגוריה", "פעיל", "חבר", "הערות", ...(isAdmin ? [""] : [])].map((h, i) => (
+          {["שם", "שם משתמש", "פלטפורמה", "קטגוריה", "חברים", "פעיל", "חבר", "הערות", ...(isAdmin ? [""] : [])].map((h, i) => (
             <div key={i} style={{ color: T.textFaint, fontSize: 11, fontWeight: 700, letterSpacing: "0.05em" }}>{h}</div>
           ))}
         </div>
@@ -525,6 +527,11 @@ export default function ChannelsScreen({ isAdmin }) {
 
               {/* Category */}
               <div style={{ color: T.textDim, fontSize: 12 }}>{ch.category || "—"}</div>
+
+              {/* Members count */}
+              <div style={{ color: T.textDim, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
+                {ch.members_count || "—"}
+              </div>
 
               {/* is_active */}
               <div>
@@ -604,9 +611,10 @@ export default function ChannelsScreen({ isAdmin }) {
                 padding: "12px 16px", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end",
               }}>
                 {[
-                  { key: "name",     label: "שם",       width: "200px" },
-                  { key: "category", label: "קטגוריה",  width: "130px" },
-                  { key: "notes",    label: "הערות",    width: "200px" },
+                  { key: "name",          label: "שם",          width: "180px" },
+                  { key: "category",      label: "קטגוריה",     width: "120px" },
+                  { key: "members_count", label: "חברים",       width: "90px"  },
+                  { key: "notes",         label: "הערות",       width: "180px" },
                 ].map(f => (
                   <div key={f.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <label style={{ color: T.textFaint, fontSize: 10, fontWeight: 700, letterSpacing: "0.05em" }}>
