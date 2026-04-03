@@ -33,6 +33,28 @@ const Toggle = ({ on, onChange }) => (
   </div>
 );
 
+const PLATFORM_META = {
+  telegram:  { icon: "✈️", label: "טלגרם",    color: "#229ed9" },
+  facebook:  { icon: "📘", label: "פייסבוק",  color: "#1877f2" },
+  linkedin:  { icon: "💼", label: "לינקדאין", color: "#0077b5" },
+  whatsapp:  { icon: "💬", label: "וואטסאפ", color: "#25d366" },
+};
+
+const PlatformBadge = ({ platform }) => {
+  const p = platform?.toLowerCase() || "telegram";
+  const { icon, label, color } = PLATFORM_META[p] || { icon: "🌐", label: "אחר", color: "#6b7280" };
+  return (
+    <span style={{
+      background: color + "22", color,
+      border: `1px solid ${color}44`,
+      borderRadius: 6, padding: "2px 8px",
+      fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
+    }}>
+      {icon} {label}
+    </span>
+  );
+};
+
 const EMPTY_FORM = { name: "", username: "", category: "", is_active: true, is_member: false, notes: "" };
 
 const FALLBACK_SUGGESTED = [
@@ -417,7 +439,8 @@ export default function ChannelsScreen({ isAdmin }) {
                 <div style={{ color: T.accentHi, fontSize: 12, fontFamily: "monospace", direction: "ltr" }}>
                   @{ch.username}
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  <PlatformBadge platform={ch.platform} />
                   <span style={{
                     background: T.card, border: `1px solid ${T.border}`,
                     borderRadius: 5, padding: "2px 7px",
@@ -425,6 +448,23 @@ export default function ChannelsScreen({ isAdmin }) {
                   }}>
                     {ch.category || "—"}
                   </span>
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 2, flexWrap: "wrap" }}>
+                  <a
+                    href={`https://t.me/${ch.username}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      background: "none",
+                      border: `1px solid #229ed966`,
+                      color: "#229ed9",
+                      borderRadius: 6, padding: "4px 10px",
+                      fontSize: 12, fontWeight: 600,
+                      textDecoration: "none", whiteSpace: "nowrap",
+                    }}
+                  >
+                    ✈️ הצטרף בטלגרם
+                  </a>
                   {isAdmin && (
                     alreadyAdded ? (
                       <span style={{ color: T.green, fontSize: 11, fontWeight: 700 }}>✓ נוסף</span>
@@ -492,15 +532,7 @@ export default function ChannelsScreen({ isAdmin }) {
             </div>
 
             {/* Platform */}
-            <div>
-              <span style={{
-                background: "#229ed922", color: "#229ed9",
-                border: "1px solid #229ed944",
-                borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700,
-              }}>
-                {ch.platform === "telegram" ? "✈️ טלגרם" : ch.platform}
-              </span>
-            </div>
+            <div><PlatformBadge platform={ch.platform} /></div>
 
             {/* Category */}
             <div style={{ color: T.textDim, fontSize: 12 }}>{ch.category || "—"}</div>
