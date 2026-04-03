@@ -58,7 +58,9 @@ const PlatformBadge = ({ platform }) => {
 const EMPTY_FORM = { name: "", username: "", category: "", is_active: true, is_member: false, notes: "" };
 
 const FALLBACK_SUGGESTED = [
-  { name: "Machine & Deep Learning Israel (ערוץ)", username: "MDLI1", category: "ML/DL/AI", platform: "telegram" },
+  { name: "Machine & Deep Learning Israel", username: "MDLI1",             category: "ML/DL/AI",  platform: "telegram" },
+  { name: "בינה מלאכותית בעברית",           username: "hackit770",         category: "AI",        platform: "telegram" },
+  { name: "חדשות טכנולוגיה ישראל",          username: "tech_news_israel",  category: "Tech News", platform: "telegram" },
 ];
 
 export default function ChannelsScreen({ isAdmin }) {
@@ -106,6 +108,14 @@ export default function ChannelsScreen({ isAdmin }) {
   };
 
   const searchNewChannels = () => setShowSearchTip(t => !t);
+
+  const clearSuggestedCache = async () => {
+    await supabase.from("app_config").delete()
+      .in("key", ["suggested_channels_cache", "suggested_channels_updated_at"]);
+    setSuggested(FALLBACK_SUGGESTED);
+    setSuggestedUpdated("");
+    showToast("✅ הרשימה נוקתה, נטענו ערוצים מאומתים בלבד");
+  };
 
   const fetchChannels = async () => {
     setLoading(true);
@@ -328,16 +338,28 @@ export default function ChannelsScreen({ isAdmin }) {
               </span>
             )}
           </div>
-          <button
-            onClick={searchNewChannels}
-            style={{
-              background: T.card, border: `1px solid ${T.border}`,
-              color: T.accentHi, borderRadius: 8, padding: "7px 14px",
-              cursor: "pointer", fontSize: 13, fontWeight: 600,
-            }}
-          >
-            🔍 חפש ערוצים חדשים
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={clearSuggestedCache}
+              style={{
+                background: "none", border: `1px solid ${T.red}66`,
+                color: T.red, borderRadius: 8, padding: "7px 14px",
+                cursor: "pointer", fontSize: 13, fontWeight: 600,
+              }}
+            >
+              🗑 נקה רשימה
+            </button>
+            <button
+              onClick={searchNewChannels}
+              style={{
+                background: T.card, border: `1px solid ${T.border}`,
+                color: T.accentHi, borderRadius: 8, padding: "7px 14px",
+                cursor: "pointer", fontSize: 13, fontWeight: 600,
+              }}
+            >
+              🔍 חפש ערוצים חדשים
+            </button>
+          </div>
         </div>
 
         {/* Search tip */}
