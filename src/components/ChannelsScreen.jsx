@@ -35,20 +35,120 @@ const Toggle = ({ on, onChange }) => (
 
 const EMPTY_FORM = { name: "", username: "", category: "", is_active: true, is_member: false, notes: "" };
 
-export default function ChannelsScreen({ isAdmin }) {
-  const [channels,    setChannels]  = useState([]);
-  const [loading,     setLoading]   = useState(true);
-  const [error,       setError]     = useState("");
-  const [toast,       setToast]     = useState("");
-  const [saving,      setSaving]    = useState(null);
-  const [showForm,    setShowForm]  = useState(false);
-  const [form,        setForm]      = useState(EMPTY_FORM);
-  const [submitting,  setSubmitting]= useState(false);
-  const [deleteId,    setDeleteId]  = useState(null);
+const FALLBACK_SUGGESTED = [
+  { name: "Machine & Deep Learning Israel",    username: "MDLI1",             category: "AI/ML"            },
+  { name: "Data Science Israel",               username: "DataScienceIL",     category: "Data Science"     },
+  { name: "Israel Data Engineering",           username: "IsraelDataEng",     category: "Data Engineering" },
+  { name: "Israeli AI Community",              username: "IsraeliAI",         category: "AI/ML"            },
+  { name: "Data Platform Israel",              username: "DataPlatformIL",    category: "Data Platform"    },
+  { name: "BI & Analytics Israel",             username: "BIAnalyticsIL",     category: "BI/Analytics"     },
+  { name: "MLOps Israel",                      username: "MLOpsIsrael",       category: "MLOps"            },
+  { name: "Python Israel",                     username: "PythonIsrael",      category: "Programming"      },
+];
 
-  useEffect(() => { fetchChannels(); }, []);
+export default function ChannelsScreen({ isAdmin }) {
+  const [channels,         setChannels]        = useState([]);
+  const [loading,          setLoading]         = useState(true);
+  const [error,            setError]           = useState("");
+  const [toast,            setToast]           = useState("");
+  const [saving,           setSaving]          = useState(null);
+  const [showForm,         setShowForm]        = useState(false);
+  const [form,             setForm]            = useState(EMPTY_FORM);
+  const [submitting,       setSubmitting]      = useState(false);
+  const [deleteId,         setDeleteId]        = useState(null);
+  const [suggested,        setSuggested]       = useState(FALLBACK_SUGGESTED);
+  const [suggestedUpdated, setSuggestedUpdated]= useState("");
+  const [searching,        setSearching]       = useState(false);
+
+  useEffect(() => { fetchChannels(); loadSuggestedCache(); }, []);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
+
+  const loadSuggestedCache = async () => {
+    const { data } = await supabase
+      .from("app_config")
+      .select("key,value")
+      .in("key", ["suggested_channels_cache", "suggested_channels_updated_at"]);
+    if (!data || data.length === 0) return;
+    const byKey = Object.fromEntries(data.map(r => [r.key, r.value]));
+    if (byKey.suggested_channels_cache) {
+      try {
+        const parsed = JSON.parse(byKey.suggested_channels_cache);
+        if (Array.isArray(parsed) && parsed.length > 0) setSuggested(parsed);
+      } catch { /* keep fallback */ }
+    }
+    if (byKey.suggested_channels_updated_at) setSuggestedUpdated(byKey.suggested_channels_updated_at);
+  };
+
+  const saveSuggestedCache = async (list, updatedAt) => {
+    await supabase.from("app_config").upsert(
+      [
+        { key: "suggested_channels_cache",      value: JSON.stringify(list) },
+        { key: "suggested_channels_updated_at", value: updatedAt            },
+      ],
+      { onConflict: "key" }
+    );
+  };
+
+  const searchNewChannels = async () => {
+    const apiKey = localStorage.getItem("digest_claude_key");
+    if (!apiKey) { setError("מפתח Claude API לא נמצא. הגדר אותו בהגדרות."); return; }
+    setSearching(true);
+    setError("");
+    try {
+      const prompt =
+        "Search for Israeli Data/AI/ML/BI Telegram communities and channels. " +
+        "Return a JSON array of channels with fields: name (Hebrew or English), " +
+        "username (Telegram username without @), category (one of: AI/ML, Data Science, " +
+        "Data Engineering, BI/Analytics, MLOps, Data Platform, Community, Programming). " +
+        "Focus on Israeli communities. Return at least 20 channels. " +
+        "Return ONLY valid JSON array, no markdown.";
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key":         apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type":      "application/json",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model:      "claude-sonnet-4-6",
+          max_tokens: 2000,
+          messages:   [{ role: "user", content: prompt }],
+        }),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`Claude API error ${res.status}: ${errBody}`);
+      }
+
+      const data    = await res.json();
+      let rawText   = data.content[0].text.trim();
+      if (rawText.startsWith("```")) {
+        rawText = rawText.replace(/^```(?:json)?/, "").replace(/```$/, "").trim();
+      }
+      const fetched = JSON.parse(rawText);
+
+      // Merge: fetched first, then keep existing entries not in fetched
+      const existingUsernames = new Set(fetched.map(c => c.username.toLowerCase()));
+      const merged = [
+        ...fetched,
+        ...suggested.filter(c => !existingUsernames.has(c.username.toLowerCase())),
+      ];
+
+      const updatedAt = new Date().toLocaleDateString("he-IL");
+      setSuggested(merged);
+      setSuggestedUpdated(updatedAt);
+      await saveSuggestedCache(merged, updatedAt);
+      showToast(`✅ נמצאו ${fetched.length} ערוצים, רשימה עודכנה`);
+    } catch (e) {
+      setError(`שגיאה בחיפוש ערוצים: ${e.message}`);
+    } finally {
+      setSearching(false);
+    }
+  };
 
   const fetchChannels = async () => {
     setLoading(true);
@@ -258,6 +358,99 @@ export default function ChannelsScreen({ isAdmin }) {
           </div>
         </div>
       )}
+
+      {/* Suggested channels */}
+      <div style={{ marginBottom: 28 }}>
+        {/* Section header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+          <div>
+            <span style={{ color: T.text, fontSize: 15, fontWeight: 700 }}>⭐ ערוצים מומלצים</span>
+            {suggestedUpdated && (
+              <span style={{ color: T.textFaint, fontSize: 11, marginRight: 10 }}>
+                עודכן לאחרונה: {suggestedUpdated}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={searchNewChannels}
+            disabled={searching}
+            style={{
+              background: searching ? T.muted : T.card,
+              border: `1px solid ${T.border}`,
+              color: searching ? T.textFaint : T.accentHi,
+              borderRadius: 8, padding: "7px 14px",
+              cursor: searching ? "not-allowed" : "pointer",
+              fontSize: 13, fontWeight: 600,
+              display: "flex", alignItems: "center", gap: 6,
+            }}
+          >
+            {searching ? (
+              <>
+                <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⏳</span>
+                מחפש...
+              </>
+            ) : "🔍 חפש ערוצים חדשים"}
+          </button>
+        </div>
+
+        {/* Cards grid */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+          gap: 10,
+        }}>
+          {suggested.map((ch) => {
+            const alreadyAdded = channels.some(
+              c => c.username.toLowerCase() === ch.username.toLowerCase()
+            );
+            return (
+              <div key={ch.username} style={{
+                background: T.panel,
+                border: `1px solid ${alreadyAdded ? T.green + "44" : T.border}`,
+                borderRadius: 10, padding: "12px 14px",
+                display: "flex", flexDirection: "column", gap: 6,
+                opacity: alreadyAdded ? 0.6 : 1,
+              }}>
+                <div style={{ color: T.text, fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>
+                  {ch.name}
+                </div>
+                <div style={{ color: T.accentHi, fontSize: 12, fontFamily: "monospace", direction: "ltr" }}>
+                  @{ch.username}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
+                  <span style={{
+                    background: T.card, border: `1px solid ${T.border}`,
+                    borderRadius: 5, padding: "2px 7px",
+                    color: T.textDim, fontSize: 11,
+                  }}>
+                    {ch.category || "—"}
+                  </span>
+                  {isAdmin && (
+                    alreadyAdded ? (
+                      <span style={{ color: T.green, fontSize: 11, fontWeight: 700 }}>✓ נוסף</span>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setForm({ ...EMPTY_FORM, name: ch.name, username: ch.username, category: ch.category || "" });
+                          setShowForm(true);
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        style={{
+                          background: T.accent, border: "none", color: "#fff",
+                          borderRadius: 6, padding: "4px 10px",
+                          cursor: "pointer", fontSize: 12, fontWeight: 700,
+                        }}
+                      >
+                        ➕ הוסף
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Table */}
       <div style={{ background: T.panel, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
