@@ -73,6 +73,8 @@ export default function ChannelsScreen({ isAdmin }) {
   const [form,             setForm]            = useState(EMPTY_FORM);
   const [submitting,       setSubmitting]      = useState(false);
   const [deleteId,         setDeleteId]        = useState(null);
+  const [editId,           setEditId]          = useState(null);
+  const [editForm,         setEditForm]        = useState({});
   const [suggested,        setSuggested]       = useState(FALLBACK_SUGGESTED);
   const [suggestedUpdated, setSuggestedUpdated]= useState("");
   const [showSearchTip,    setShowSearchTip]   = useState(false);
@@ -159,6 +161,33 @@ export default function ChannelsScreen({ isAdmin }) {
     setSubmitting(false);
   };
 
+  const toggleMember = async (id, val) => {
+    setSaving(id);
+    setChannels(prev => prev.map(c => c.id === id ? { ...c, is_member: val } : c));
+    const { error: err } = await supabase
+      .from("telegram_channels").update({ is_member: val }).eq("id", id);
+    if (err) { setError(`שגיאת שמירה: ${err.message}`); fetchChannels(); }
+    else showToast(val ? "✅ סומן כחבר" : "✅ סומן כלא חבר");
+    setSaving(null);
+  };
+
+  const startEdit = (ch) => {
+    setEditId(ch.id);
+    setEditForm({ name: ch.name, category: ch.category || "", notes: ch.notes || "" });
+  };
+
+  const saveEdit = async () => {
+    setSaving(editId);
+    const { error: err } = await supabase
+      .from("telegram_channels")
+      .update({ name: editForm.name.trim(), category: editForm.category.trim() || null, notes: editForm.notes.trim() || null })
+      .eq("id", editId);
+    if (err) setError(`שגיאת עדכון: ${err.message}`);
+    else { showToast("✅ ערוץ עודכן"); fetchChannels(); }
+    setSaving(null);
+    setEditId(null);
+  };
+
   const confirmDelete = async () => {
     const { error: err } = await supabase
       .from("telegram_channels").delete().eq("id", deleteId);
@@ -168,7 +197,7 @@ export default function ChannelsScreen({ isAdmin }) {
   };
 
   const colTemplate = isAdmin
-    ? "2fr 1.3fr 1fr 1fr 70px 70px 1.5fr 44px"
+    ? "2fr 1.3fr 1fr 1fr 70px 70px 1.5fr 88px"
     : "2fr 1.3fr 1fr 1fr 70px 70px 1.5fr";
 
   return (
@@ -474,77 +503,149 @@ export default function ChannelsScreen({ isAdmin }) {
         )}
 
         {!loading && channels.map((ch, i) => (
-          <div key={ch.id} style={{
-            display: "grid", gridTemplateColumns: colTemplate,
-            padding: "12px 16px", alignItems: "center",
-            background: i % 2 === 0 ? T.panel : T.card + "80",
-            borderBottom: `1px solid ${T.border}`,
-            opacity: saving === ch.id ? 0.6 : 1, transition: "opacity .2s",
-          }}>
-            {/* Name */}
-            <div style={{ color: T.text, fontSize: 13, fontWeight: 600 }}>{ch.name}</div>
+          <div key={ch.id}>
+            {/* Main row */}
+            <div style={{
+              display: "grid", gridTemplateColumns: colTemplate,
+              padding: "12px 16px", alignItems: "center",
+              background: i % 2 === 0 ? T.panel : T.card + "80",
+              borderBottom: editId === ch.id ? "none" : `1px solid ${T.border}`,
+              opacity: saving === ch.id ? 0.6 : 1, transition: "opacity .2s",
+            }}>
+              {/* Name */}
+              <div style={{ color: T.text, fontSize: 13, fontWeight: 600 }}>{ch.name}</div>
 
-            {/* Username */}
-            <div style={{ color: T.accentHi, fontSize: 12, fontFamily: "monospace", direction: "ltr" }}>
-              @{ch.username}
-            </div>
+              {/* Username */}
+              <div style={{ color: T.accentHi, fontSize: 12, fontFamily: "monospace", direction: "ltr" }}>
+                @{ch.username}
+              </div>
 
-            {/* Platform */}
-            <div><PlatformBadge platform={ch.platform} /></div>
+              {/* Platform */}
+              <div><PlatformBadge platform={ch.platform} /></div>
 
-            {/* Category */}
-            <div style={{ color: T.textDim, fontSize: 12 }}>{ch.category || "—"}</div>
+              {/* Category */}
+              <div style={{ color: T.textDim, fontSize: 12 }}>{ch.category || "—"}</div>
 
-            {/* is_active */}
-            <div>
-              {isAdmin ? (
-                <Toggle on={!!ch.is_active} onChange={val => toggleActive(ch.id, val)} />
-              ) : (
-                <span style={{
-                  background: ch.is_active ? T.green + "22" : T.muted + "22",
-                  color:      ch.is_active ? T.green       : T.muted,
-                  border:    `1px solid ${ch.is_active ? T.green + "44" : T.muted + "44"}`,
-                  borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700,
-                }}>
-                  {ch.is_active ? "פעיל" : "לא פעיל"}
-                </span>
+              {/* is_active */}
+              <div>
+                {isAdmin ? (
+                  <Toggle on={!!ch.is_active} onChange={val => toggleActive(ch.id, val)} />
+                ) : (
+                  <span style={{
+                    background: ch.is_active ? T.green + "22" : T.muted + "22",
+                    color:      ch.is_active ? T.green       : T.muted,
+                    border:    `1px solid ${ch.is_active ? T.green + "44" : T.muted + "44"}`,
+                    borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700,
+                  }}>
+                    {ch.is_active ? "פעיל" : "לא פעיל"}
+                  </span>
+                )}
+              </div>
+
+              {/* is_member */}
+              <div>
+                {isAdmin ? (
+                  <Toggle on={!!ch.is_member} onChange={val => toggleMember(ch.id, val)} />
+                ) : (
+                  <span style={{
+                    background: ch.is_member ? T.accentHi + "22" : T.muted + "22",
+                    color:      ch.is_member ? T.accentHi       : T.muted,
+                    border:    `1px solid ${ch.is_member ? T.accentHi + "44" : T.muted + "44"}`,
+                    borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700,
+                  }}>
+                    {ch.is_member ? "חבר" : "לא חבר"}
+                  </span>
+                )}
+              </div>
+
+              {/* Notes */}
+              <div style={{
+                color: T.textFaint, fontSize: 12,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>
+                {ch.notes || "—"}
+              </div>
+
+              {/* Edit + Delete (admin only) */}
+              {isAdmin && (
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button
+                    onClick={() => editId === ch.id ? setEditId(null) : startEdit(ch)}
+                    title="ערוך"
+                    style={{
+                      background: editId === ch.id ? T.accent + "33" : "none",
+                      border: `1px solid ${editId === ch.id ? T.accent : T.border}`,
+                      color: editId === ch.id ? T.accentHi : T.textDim,
+                      borderRadius: 6, padding: "4px 7px",
+                      cursor: "pointer", fontSize: 13, lineHeight: 1,
+                    }}
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => setDeleteId(ch.id)}
+                    title="מחק ערוץ"
+                    style={{
+                      background: "none", border: `1px solid ${T.border}`,
+                      color: T.red, borderRadius: 6, padding: "4px 7px",
+                      cursor: "pointer", fontSize: 13, lineHeight: 1,
+                    }}
+                  >
+                    🗑️
+                  </button>
+                </div>
               )}
             </div>
 
-            {/* is_member */}
-            <div>
-              <span style={{
-                background: ch.is_member ? T.accentHi + "22" : T.muted + "22",
-                color:      ch.is_member ? T.accentHi       : T.muted,
-                border:    `1px solid ${ch.is_member ? T.accentHi + "44" : T.muted + "44"}`,
-                borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700,
+            {/* Inline edit row */}
+            {isAdmin && editId === ch.id && (
+              <div style={{
+                background: T.card, borderBottom: `1px solid ${T.border}`,
+                padding: "12px 16px", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end",
               }}>
-                {ch.is_member ? "חבר" : "לא חבר"}
-              </span>
-            </div>
-
-            {/* Notes */}
-            <div style={{
-              color: T.textFaint, fontSize: 12,
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>
-              {ch.notes || "—"}
-            </div>
-
-            {/* Delete (admin only) */}
-            {isAdmin && (
-              <div>
-                <button
-                  onClick={() => setDeleteId(ch.id)}
-                  title="מחק ערוץ"
-                  style={{
-                    background: "none", border: `1px solid ${T.border}`,
-                    color: T.red, borderRadius: 6, padding: "4px 7px",
-                    cursor: "pointer", fontSize: 13, lineHeight: 1,
-                  }}
-                >
-                  🗑️
-                </button>
+                {[
+                  { key: "name",     label: "שם",       width: "200px" },
+                  { key: "category", label: "קטגוריה",  width: "130px" },
+                  { key: "notes",    label: "הערות",    width: "200px" },
+                ].map(f => (
+                  <div key={f.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ color: T.textFaint, fontSize: 10, fontWeight: 700, letterSpacing: "0.05em" }}>
+                      {f.label}
+                    </label>
+                    <input
+                      value={editForm[f.key]}
+                      onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
+                      style={{
+                        width: f.width, background: T.panel, border: `1px solid ${T.border}`,
+                        borderRadius: 6, padding: "6px 10px", color: T.text,
+                        fontSize: 13, outline: "none",
+                      }}
+                    />
+                  </div>
+                ))}
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={saveEdit}
+                    disabled={!editForm.name.trim() || saving === ch.id}
+                    style={{
+                      background: T.accent, border: "none", color: "#fff",
+                      borderRadius: 6, padding: "7px 14px", cursor: "pointer",
+                      fontSize: 13, fontWeight: 700,
+                      opacity: !editForm.name.trim() || saving === ch.id ? 0.5 : 1,
+                    }}
+                  >
+                    {saving === ch.id ? "שומר..." : "שמור"}
+                  </button>
+                  <button
+                    onClick={() => setEditId(null)}
+                    style={{
+                      background: "none", border: `1px solid ${T.border}`, color: T.textDim,
+                      borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontSize: 13,
+                    }}
+                  >
+                    ביטול
+                  </button>
+                </div>
               </div>
             )}
           </div>
