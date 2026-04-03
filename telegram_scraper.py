@@ -12,10 +12,60 @@ from telethon import TelegramClient
 from secrets import TELEGRAM_API_ID, TELEGRAM_API_HASH, CLAUDE_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY
 
 
+def load_config_from_supabase():
+    """Fetch all rows from app_config and return a flat dict. Returns {} on failure."""
+    req = urllib.request.Request(
+        f"{SUPABASE_URL}/rest/v1/app_config?select=key,value",
+        headers={
+            "apikey": SUPABASE_SERVICE_KEY,
+            "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req) as response:
+            rows = json.loads(response.read().decode("utf-8"))
+        if not rows:
+            print("app_config table is empty, will fall back to config.json.")
+            return {}
+        return {row["key"]: row["value"] for row in rows}
+    except Exception as e:
+        print(f"Warning: failed to fetch app_config from Supabase: {e}")
+        return {}
+
+
 def load_config():
+    """Load settings: Supabase app_config first, fall back to config.json."""
+    supabase_cfg = load_config_from_supabase()
+
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
-    with open(config_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            file_cfg = json.load(f)
+    except Exception:
+        file_cfg = {}
+
+    # Build a unified flat config, preferring Supabase values
+    file_email = file_cfg.get("email", {})
+    file_recipients = file_email.get("recipients", [])
+
+    def _get(key, file_val, default):
+        return supabase_cfg[key] if key in supabase_cfg else (file_val if file_val is not None else default)
+
+    recipients_raw = supabase_cfg.get("recipients", "")
+    if recipients_raw:
+        recipients = [r.strip() for r in recipients_raw.split(",") if r.strip()]
+    else:
+        recipients = file_recipients
+
+    config = {
+        "messages_limit":      int(_get("messages_limit", file_cfg.get("messages_limit"), 100)),
+        "topics_per_category": int(_get("topics_per_category", file_cfg.get("topics_per_category"), 5)),
+        "gmail_user":          _get("gmail_user", file_email.get("gmail_user", ""), ""),
+        "gmail_pass":          _get("gmail_pass", file_email.get("gmail_app_password", ""), ""),
+        "recipients":          recipients,
+        "_source":             "supabase" if supabase_cfg else "config.json",
+    }
+    return config
 
 
 def fetch_active_channels():
@@ -184,66 +234,104 @@ def save_run_log(log_data):
 def build_email_html(report):
     topics = report.get("topics", [])
     TREND_META = {
-        "עולה": ("#10b981", "↑ עולה"),
-        "יורד": ("#ef4444", "↓ יורד"),
-        "יציב": ("#4b5563", "→ יציב"),
+        "עולה": ("#16a34a", "#dcfce7", "↑ עולה"),
+        "יורד": ("#dc2626", "#fee2e2", "↓ יורד"),
+        "יציב": ("#6b7280", "#f3f4f6", "→ יציב"),
     }
 
-    rows_html = ""
+    topics_html = ""
     for i, t in enumerate(topics, 1):
-        color, label = TREND_META.get(t.get("trend", ""), ("#4b5563", t.get("trend", "—")))
-        url = t.get("top_post_url") or ""
-        url_html = (
-            f'<br><a href="{url}" style="color:#3b82f6;font-size:12px;text-decoration:none;">פתח פוסט מוביל ↗</a>'
-            if url and url != "null" else ""
+        text_color, bg_color, label = TREND_META.get(
+            t.get("trend", ""), ("#6b7280", "#f3f4f6", t.get("trend", "—"))
         )
+
         avg_views = t.get("avg_views", 0)
         avg_views_fmt = f"{avg_views:,}" if isinstance(avg_views, int) else str(avg_views)
-        rows_html += f"""
-        <tr>
-          <td style="padding:4px 16px 4px 8px;color:#4b5563;font-size:13px;vertical-align:top;white-space:nowrap;">{i}.</td>
-          <td style="padding:12px 16px 12px 0;border-bottom:1px solid #1e2d45;vertical-align:top;">
-            <div style="color:#e2e8f0;font-weight:700;font-size:14px;margin-bottom:4px;">{t.get("title","")}</div>
-            <div style="color:#94a3b8;font-size:12px;line-height:1.6;">{t.get("summary","")}</div>
-            {url_html}
-          </td>
-          <td style="padding:12px 16px 12px 0;border-bottom:1px solid #1e2d45;vertical-align:top;white-space:nowrap;">
-            <span style="background:{color}22;color:{color};border:1px solid {color}44;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;">{label}</span>
-          </td>
-          <td style="padding:12px 16px 12px 0;border-bottom:1px solid #1e2d45;vertical-align:top;color:#94a3b8;font-size:12px;white-space:nowrap;">
-            {t.get("posts_count",0)} פוסטים<br>{avg_views_fmt} צפיות
-          </td>
-        </tr>"""
+        weekly = t.get("weekly_posts_count", 0)
+        posts  = t.get("posts_count", 0)
+
+        url = t.get("top_post_url") or ""
+        url_html = (
+            f'<a href="{url}" style="display:inline-block;margin-top:10px;color:#2563eb;'
+            f'font-size:13px;font-weight:600;text-decoration:none;">פוסט מוביל ←</a>'
+            if url and url != "null" else ""
+        )
+
+        points = t.get("discussion_points") or []
+        if points:
+            bullets = "".join(
+                f'<li style="margin-bottom:4px;color:#374151;font-size:13px;line-height:1.6;">{p}</li>'
+                for p in points
+            )
+            points_html = (
+                f'<ul style="margin:10px 0 0 0;padding-right:18px;padding-left:0;list-style:disc;">'
+                f'{bullets}</ul>'
+            )
+        else:
+            points_html = ""
+
+        border_top = "border-top:2px solid #e5e7eb;" if i > 1 else ""
+        topics_html += f"""
+      <div style="padding:20px 28px;{border_top}">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div style="font-size:16px;font-weight:700;color:#111827;line-height:1.4;flex:1;">
+            <span style="color:#9ca3af;font-size:13px;margin-left:6px;">{i}.</span>{t.get("title", "")}
+          </div>
+          <span style="background:{bg_color};color:{text_color};border:1px solid {text_color}44;
+                       border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;white-space:nowrap;">
+            {label}
+          </span>
+        </div>
+        <p style="margin:8px 0 0 0;color:#4b5563;font-size:14px;line-height:1.7;">{t.get("summary", "")}</p>
+        <div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;">
+          <span style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;
+                       padding:4px 10px;font-size:12px;color:#374151;">
+            📄 {posts} פוסטים בנושא
+          </span>
+          <span style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;
+                       padding:4px 10px;font-size:12px;color:#374151;">
+            📅 {weekly} השבוע
+          </span>
+          <span style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;
+                       padding:4px 10px;font-size:12px;color:#374151;">
+            👁 ממוצע {avg_views_fmt} צפיות
+          </span>
+        </div>
+        {url_html}
+        {points_html}
+      </div>"""
 
     return f"""<!DOCTYPE html>
 <html dir="rtl" lang="he">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#0a0f1a;font-family:'Segoe UI',Arial,sans-serif;direction:rtl;">
-  <div style="max-width:680px;margin:0 auto;padding:24px 16px;">
-    <div style="background:#111827;border-radius:16px;overflow:hidden;border:1px solid #1e2d45;">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',Arial,sans-serif;direction:rtl;text-align:right;">
+  <div style="max-width:660px;margin:32px auto;padding:0 16px;">
 
-      <!-- Header -->
-      <div style="background:#1a2236;padding:24px 28px;border-bottom:1px solid #1e2d45;">
-        <div style="color:#3b82f6;font-size:12px;font-weight:700;letter-spacing:0.08em;margin-bottom:6px;">📊 DATA DIGEST ISRAEL</div>
-        <div style="color:#e2e8f0;font-size:22px;font-weight:800;margin-bottom:6px;">{report["report_date"]}</div>
-        <div style="color:#94a3b8;font-size:13px;">
-          {report["source"]} &nbsp;·&nbsp; {report["total_posts_analyzed"]} הודעות נסרקו
-        </div>
-      </div>
-
-      <!-- Topics -->
-      <div style="padding:16px 28px 0;">
-        <div style="color:#4b5563;font-size:10px;font-weight:700;letter-spacing:0.08em;margin-bottom:12px;">נושאים מובילים</div>
-        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-          {rows_html}
-        </table>
-      </div>
-
-      <!-- Footer -->
-      <div style="padding:20px 28px;color:#374151;font-size:11px;text-align:center;">
-        נוצר אוטומטית על ידי Data Digest Israel · {datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M")} UTC
+    <!-- Header -->
+    <div style="background:#1e3a5f;border-radius:12px 12px 0 0;padding:28px 28px 24px;">
+      <div style="font-size:12px;font-weight:700;letter-spacing:0.1em;color:#93c5fd;margin-bottom:8px;">DATA DIGEST IL</div>
+      <div style="font-size:26px;font-weight:800;color:#ffffff;margin-bottom:6px;">סיכום קהילות טק ישראל</div>
+      <div style="font-size:14px;color:#bfdbfe;">
+        {report["report_date"]} &nbsp;·&nbsp; {report["source"]} &nbsp;·&nbsp; {report["total_posts_analyzed"]} הודעות נסרקו
       </div>
     </div>
+
+    <!-- Topics card -->
+    <div style="background:#ffffff;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none;">
+      <div style="padding:16px 28px 12px;border-bottom:1px solid #e5e7eb;">
+        <span style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:#6b7280;text-transform:uppercase;">נושאים מובילים</span>
+      </div>
+      {topics_html}
+
+      <!-- Footer -->
+      <div style="padding:16px 28px;border-top:1px solid #e5e7eb;text-align:center;color:#9ca3af;font-size:11px;">
+        נוצר אוטומטית על ידי Data Digest IL · {datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M")} UTC
+      </div>
+    </div>
+
   </div>
 </body>
 </html>"""
@@ -251,16 +339,15 @@ def build_email_html(report):
 
 def send_email_digest(report, config):
     """Send HTML digest email via Gmail SMTP. Silently skips if not configured."""
-    email_cfg = config.get("email", {})
-    gmail_user = email_cfg.get("gmail_user", "").strip()
-    gmail_pass = email_cfg.get("gmail_app_password", "").strip()
-    recipients = [r.strip() for r in email_cfg.get("recipients", []) if r.strip()]
+    gmail_user = config.get("gmail_user", "").strip()
+    gmail_pass = config.get("gmail_pass", "").strip()
+    recipients = [r.strip() for r in config.get("recipients", []) if r.strip()]
 
     if not gmail_user or not gmail_pass or not recipients:
         print("Email not configured, skipping digest email.")
         return
 
-    subject = f"Data Digest Israel – {report['report_date']}"
+    subject = f"Data Digest IL – סיכום קהילות {report['report_date']}"
     html_body = build_email_html(report)
 
     msg = MIMEMultipart("alternative")
@@ -291,9 +378,13 @@ async def main():
 
     try:
         config              = load_config()
-        messages_limit      = config.get("messages_limit", 100)
-        topics_per_category = config.get("topics_per_category", 5)
-        print(f"Config: messages_limit={messages_limit}, topics_per_category={topics_per_category}")
+        messages_limit      = config["messages_limit"]
+        topics_per_category = config["topics_per_category"]
+        print(f"Config source: {config['_source']}")
+        print(f"  messages_limit={messages_limit}")
+        print(f"  topics_per_category={topics_per_category}")
+        print(f"  gmail_user={config['gmail_user'] or '(not set)'}")
+        print(f"  recipients={config['recipients'] or '(not set)'}")
 
         channels_list = fetch_active_channels()
         if not channels_list:
