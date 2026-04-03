@@ -58,14 +58,7 @@ const PlatformBadge = ({ platform }) => {
 const EMPTY_FORM = { name: "", username: "", category: "", is_active: true, is_member: false, notes: "" };
 
 const FALLBACK_SUGGESTED = [
-  { name: "Machine & Deep Learning Israel",    username: "MDLI1",             category: "AI/ML"            },
-  { name: "Data Science Israel",               username: "DataScienceIL",     category: "Data Science"     },
-  { name: "Israel Data Engineering",           username: "IsraelDataEng",     category: "Data Engineering" },
-  { name: "Israeli AI Community",              username: "IsraeliAI",         category: "AI/ML"            },
-  { name: "Data Platform Israel",              username: "DataPlatformIL",    category: "Data Platform"    },
-  { name: "BI & Analytics Israel",             username: "BIAnalyticsIL",     category: "BI/Analytics"     },
-  { name: "MLOps Israel",                      username: "MLOpsIsrael",       category: "MLOps"            },
-  { name: "Python Israel",                     username: "PythonIsrael",      category: "Programming"      },
+  { name: "Machine & Deep Learning Israel (ערוץ)", username: "MDLI1", category: "ML/DL/AI", platform: "telegram" },
 ];
 
 export default function ChannelsScreen({ isAdmin }) {
@@ -80,7 +73,7 @@ export default function ChannelsScreen({ isAdmin }) {
   const [deleteId,         setDeleteId]        = useState(null);
   const [suggested,        setSuggested]       = useState(FALLBACK_SUGGESTED);
   const [suggestedUpdated, setSuggestedUpdated]= useState("");
-  const [searching,        setSearching]       = useState(false);
+  const [showSearchTip,    setShowSearchTip]   = useState(false);
 
   useEffect(() => { fetchChannels(); loadSuggestedCache(); }, []);
 
@@ -112,65 +105,7 @@ export default function ChannelsScreen({ isAdmin }) {
     );
   };
 
-  const searchNewChannels = async () => {
-    const apiKey = localStorage.getItem("digest_claude_key");
-    if (!apiKey) { setError("מפתח Claude API לא נמצא. הגדר אותו בהגדרות."); return; }
-    setSearching(true);
-    setError("");
-    try {
-      const prompt =
-        "Search for Israeli Data/AI/ML/BI Telegram communities and channels. " +
-        "Return a JSON array of channels with fields: name (Hebrew or English), " +
-        "username (Telegram username without @), category (one of: AI/ML, Data Science, " +
-        "Data Engineering, BI/Analytics, MLOps, Data Platform, Community, Programming). " +
-        "Focus on Israeli communities. Return at least 20 channels. " +
-        "Return ONLY valid JSON array, no markdown.";
-
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key":         apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type":      "application/json",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model:      "claude-sonnet-4-6",
-          max_tokens: 2000,
-          messages:   [{ role: "user", content: prompt }],
-        }),
-      });
-
-      if (!res.ok) {
-        const errBody = await res.text();
-        throw new Error(`Claude API error ${res.status}: ${errBody}`);
-      }
-
-      const data    = await res.json();
-      let rawText   = data.content[0].text.trim();
-      if (rawText.startsWith("```")) {
-        rawText = rawText.replace(/^```(?:json)?/, "").replace(/```$/, "").trim();
-      }
-      const fetched = JSON.parse(rawText);
-
-      // Merge: fetched first, then keep existing entries not in fetched
-      const existingUsernames = new Set(fetched.map(c => c.username.toLowerCase()));
-      const merged = [
-        ...fetched,
-        ...suggested.filter(c => !existingUsernames.has(c.username.toLowerCase())),
-      ];
-
-      const updatedAt = new Date().toLocaleDateString("he-IL");
-      setSuggested(merged);
-      setSuggestedUpdated(updatedAt);
-      await saveSuggestedCache(merged, updatedAt);
-      showToast(`✅ נמצאו ${fetched.length} ערוצים, רשימה עודכנה`);
-    } catch (e) {
-      setError(`שגיאה בחיפוש ערוצים: ${e.message}`);
-    } finally {
-      setSearching(false);
-    }
-  };
+  const searchNewChannels = () => setShowSearchTip(t => !t);
 
   const fetchChannels = async () => {
     setLoading(true);
@@ -395,25 +330,26 @@ export default function ChannelsScreen({ isAdmin }) {
           </div>
           <button
             onClick={searchNewChannels}
-            disabled={searching}
             style={{
-              background: searching ? T.muted : T.card,
-              border: `1px solid ${T.border}`,
-              color: searching ? T.textFaint : T.accentHi,
-              borderRadius: 8, padding: "7px 14px",
-              cursor: searching ? "not-allowed" : "pointer",
-              fontSize: 13, fontWeight: 600,
-              display: "flex", alignItems: "center", gap: 6,
+              background: T.card, border: `1px solid ${T.border}`,
+              color: T.accentHi, borderRadius: 8, padding: "7px 14px",
+              cursor: "pointer", fontSize: 13, fontWeight: 600,
             }}
           >
-            {searching ? (
-              <>
-                <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⏳</span>
-                מחפש...
-              </>
-            ) : "🔍 חפש ערוצים חדשים"}
+            🔍 חפש ערוצים חדשים
           </button>
         </div>
+
+        {/* Search tip */}
+        {showSearchTip && (
+          <div style={{
+            background: "#1e3a5f33", border: `1px solid ${T.accentHi}44`,
+            borderRadius: 8, padding: "10px 14px", marginBottom: 12,
+            color: T.textDim, fontSize: 13, lineHeight: 1.6,
+          }}>
+            💡 כדי להוסיף ערוצים נוספים, חפש ידנית בטלגרם והוסף אותם דרך כפתור <strong style={{ color: T.text }}>➕ ערוץ חדש</strong> למעלה.
+          </div>
+        )}
 
         {/* Cards grid */}
         <div style={{
