@@ -57,67 +57,22 @@ const PlatformBadge = ({ platform }) => {
 
 const EMPTY_FORM = { name: "", username: "", category: "", members_count: "", is_active: true, is_member: false, notes: "" };
 
-const FALLBACK_SUGGESTED = [
-  { name: "Machine & Deep Learning Israel", username: "MDLI1",             category: "ML/DL/AI",  platform: "telegram" },
-  { name: "בינה מלאכותית בעברית",           username: "hackit770",         category: "AI",        platform: "telegram" },
-  { name: "חדשות טכנולוגיה ישראל",          username: "tech_news_israel",  category: "Tech News", platform: "telegram" },
-];
-
 export default function ChannelsScreen({ isAdmin }) {
-  const [channels,         setChannels]        = useState([]);
-  const [loading,          setLoading]         = useState(true);
-  const [error,            setError]           = useState("");
-  const [toast,            setToast]           = useState("");
-  const [saving,           setSaving]          = useState(null);
-  const [showForm,         setShowForm]        = useState(false);
-  const [form,             setForm]            = useState(EMPTY_FORM);
-  const [submitting,       setSubmitting]      = useState(false);
-  const [deleteId,         setDeleteId]        = useState(null);
-  const [editId,           setEditId]          = useState(null);
-  const [editForm,         setEditForm]        = useState({});
-  const [suggested,        setSuggested]       = useState(FALLBACK_SUGGESTED);
-  const [suggestedUpdated, setSuggestedUpdated]= useState("");
-  const [showSearchTip,    setShowSearchTip]   = useState(false);
+  const [channels,   setChannels]  = useState([]);
+  const [loading,    setLoading]   = useState(true);
+  const [error,      setError]     = useState("");
+  const [toast,      setToast]     = useState("");
+  const [saving,     setSaving]    = useState(null);
+  const [showForm,   setShowForm]  = useState(false);
+  const [form,       setForm]      = useState(EMPTY_FORM);
+  const [submitting, setSubmitting]= useState(false);
+  const [deleteId,   setDeleteId]  = useState(null);
+  const [editId,     setEditId]    = useState(null);
+  const [editForm,   setEditForm]  = useState({});
 
-  useEffect(() => { fetchChannels(); loadSuggestedCache(); }, []);
+  useEffect(() => { fetchChannels(); }, []);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
-
-  const loadSuggestedCache = async () => {
-    const { data } = await supabase
-      .from("app_config")
-      .select("key,value")
-      .in("key", ["suggested_channels_cache", "suggested_channels_updated_at"]);
-    if (!data || data.length === 0) return;
-    const byKey = Object.fromEntries(data.map(r => [r.key, r.value]));
-    if (byKey.suggested_channels_cache) {
-      try {
-        const parsed = JSON.parse(byKey.suggested_channels_cache);
-        if (Array.isArray(parsed) && parsed.length > 0) setSuggested(parsed);
-      } catch { /* keep fallback */ }
-    }
-    if (byKey.suggested_channels_updated_at) setSuggestedUpdated(byKey.suggested_channels_updated_at);
-  };
-
-  const saveSuggestedCache = async (list, updatedAt) => {
-    await supabase.from("app_config").upsert(
-      [
-        { key: "suggested_channels_cache",      value: JSON.stringify(list) },
-        { key: "suggested_channels_updated_at", value: updatedAt            },
-      ],
-      { onConflict: "key" }
-    );
-  };
-
-  const searchNewChannels = () => setShowSearchTip(t => !t);
-
-  const clearSuggestedCache = async () => {
-    await supabase.from("app_config").delete()
-      .in("key", ["suggested_channels_cache", "suggested_channels_updated_at"]);
-    setSuggested(FALLBACK_SUGGESTED);
-    setSuggestedUpdated("");
-    showToast("✅ הרשימה נוקתה, נטענו ערוצים מאומתים בלבד");
-  };
 
   const fetchChannels = async () => {
     setLoading(true);
@@ -356,130 +311,6 @@ export default function ChannelsScreen({ isAdmin }) {
           </div>
         </div>
       )}
-
-      {/* Suggested channels */}
-      <div style={{ marginBottom: 28 }}>
-        {/* Section header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
-          <div>
-            <span style={{ color: T.text, fontSize: 15, fontWeight: 700 }}>⭐ ערוצים מומלצים</span>
-            {suggestedUpdated && (
-              <span style={{ color: T.textFaint, fontSize: 11, marginRight: 10 }}>
-                עודכן לאחרונה: {suggestedUpdated}
-              </span>
-            )}
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={clearSuggestedCache}
-              style={{
-                background: "none", border: `1px solid ${T.red}66`,
-                color: T.red, borderRadius: 8, padding: "7px 14px",
-                cursor: "pointer", fontSize: 13, fontWeight: 600,
-              }}
-            >
-              🗑 נקה רשימה
-            </button>
-            <button
-              onClick={searchNewChannels}
-              style={{
-                background: T.card, border: `1px solid ${T.border}`,
-                color: T.accentHi, borderRadius: 8, padding: "7px 14px",
-                cursor: "pointer", fontSize: 13, fontWeight: 600,
-              }}
-            >
-              🔍 חפש ערוצים חדשים
-            </button>
-          </div>
-        </div>
-
-        {/* Search tip */}
-        {showSearchTip && (
-          <div style={{
-            background: "#1e3a5f33", border: `1px solid ${T.accentHi}44`,
-            borderRadius: 8, padding: "10px 14px", marginBottom: 12,
-            color: T.textDim, fontSize: 13, lineHeight: 1.6,
-          }}>
-            💡 כדי להוסיף ערוצים נוספים, חפש ידנית בטלגרם והוסף אותם דרך כפתור <strong style={{ color: T.text }}>➕ ערוץ חדש</strong> למעלה.
-          </div>
-        )}
-
-        {/* Cards grid */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-          gap: 10,
-        }}>
-          {suggested.map((ch) => {
-            const alreadyAdded = channels.some(
-              c => c.username.toLowerCase() === ch.username.toLowerCase()
-            );
-            return (
-              <div key={ch.username} style={{
-                background: T.panel,
-                border: `1px solid ${alreadyAdded ? T.green + "44" : T.border}`,
-                borderRadius: 10, padding: "12px 14px",
-                display: "flex", flexDirection: "column", gap: 6,
-                opacity: alreadyAdded ? 0.6 : 1,
-              }}>
-                <div style={{ color: T.text, fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>
-                  {ch.name}
-                </div>
-                <div style={{ color: T.accentHi, fontSize: 12, fontFamily: "monospace", direction: "ltr" }}>
-                  @{ch.username}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                  <PlatformBadge platform={ch.platform} />
-                  <span style={{
-                    background: T.card, border: `1px solid ${T.border}`,
-                    borderRadius: 5, padding: "2px 7px",
-                    color: T.textDim, fontSize: 11,
-                  }}>
-                    {ch.category || "—"}
-                  </span>
-                </div>
-                <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 2, flexWrap: "wrap" }}>
-                  <a
-                    href={`https://t.me/${ch.username}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      background: "none",
-                      border: `1px solid #229ed966`,
-                      color: "#229ed9",
-                      borderRadius: 6, padding: "4px 10px",
-                      fontSize: 12, fontWeight: 600,
-                      textDecoration: "none", whiteSpace: "nowrap",
-                    }}
-                  >
-                    ✈️ הצטרף בטלגרם
-                  </a>
-                  {isAdmin && (
-                    alreadyAdded ? (
-                      <span style={{ color: T.green, fontSize: 11, fontWeight: 700 }}>✓ נוסף</span>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setForm({ ...EMPTY_FORM, name: ch.name, username: ch.username, category: ch.category || "" });
-                          setShowForm(true);
-                          window.scrollTo({ top: 0, behavior: "smooth" });
-                        }}
-                        style={{
-                          background: T.accent, border: "none", color: "#fff",
-                          borderRadius: 6, padding: "4px 10px",
-                          cursor: "pointer", fontSize: 12, fontWeight: 700,
-                        }}
-                      >
-                        ➕ הוסף
-                      </button>
-                    )
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
       {/* Table */}
       <div style={{ background: T.panel, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>

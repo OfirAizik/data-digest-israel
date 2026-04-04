@@ -88,6 +88,33 @@ def fetch_active_channels():
     return channels
 
 
+def format_members_count(count):
+    if count >= 1000:
+        return f"{count / 1000:.1f}K"
+    return str(count)
+
+
+def update_members_count(username, count_str):
+    payload = json.dumps({"members_count": count_str}).encode("utf-8")
+    req = urllib.request.Request(
+        f"{SUPABASE_URL}/rest/v1/telegram_channels?username=eq.{username}",
+        data=payload,
+        headers={
+            "apikey":        SUPABASE_SERVICE_KEY,
+            "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+            "Content-Type":  "application/json",
+            "Prefer":        "return=minimal",
+        },
+        method="PATCH",
+    )
+    try:
+        with urllib.request.urlopen(req) as response:
+            return response.status
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8")
+        print(f"Warning: failed to update members_count for {username} {e.code}: {body}")
+
+
 async def scrape_channel(client, channel, limit=100):
     messages = []
     cutoff = datetime.now(timezone.utc).replace(tzinfo=timezone.utc)
@@ -406,6 +433,16 @@ async def main():
 
         all_messages = []
         try:
+            for channel in channels_list:
+                try:
+                    entity = await client.get_entity(channel)
+                    count = entity.participants_count
+                    count_str = format_members_count(count)
+                    print(f"  {channel}: {count_str} members")
+                    update_members_count(channel, count_str)
+                except Exception as e:
+                    print(f"  Warning: could not fetch members_count for {channel}: {e}")
+
             for channel in channels_list:
                 print(f"Scraping channel: {channel} (limit={messages_limit})")
                 messages = await scrape_channel(client, channel, limit=messages_limit)
