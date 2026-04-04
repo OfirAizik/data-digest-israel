@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
-  const { apiKey, messages, model, max_tokens } = await request.json();
+  const { messages, model, max_tokens } = await request.json();
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    return NextResponse.json({ error: { message: "ANTHROPIC_API_KEY not configured" } }, { status: 500 });
+  }
 
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

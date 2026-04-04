@@ -371,7 +371,7 @@ function ReportCard({ report, isOpen, onToggle, openTopics, onToggleTopic, deepT
   );
 }
 
-async function generateReportForChannels(channels, apiKey) {
+async function generateReportForChannels(channels) {
   const channelList = channels
     .map(ch => `- ${ch.name} (@${ch.username}, קטגוריה: ${ch.category || "כללי"})`)
     .join("\n");
@@ -400,7 +400,6 @@ ${channelList}
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      apiKey,
       model: "claude-sonnet-4-6",
       max_tokens: 3000,
       messages: [{ role: "user", content: prompt }],
@@ -489,17 +488,11 @@ export default function ReportsScreen({ runTrigger = 0 }) {
   };
 
   const runReport = async (channelsToRun) => {
-    const apiKey = typeof window !== "undefined" ? localStorage.getItem("digest_claude_key") : null;
-    if (!apiKey) {
-      setError("מפתח Claude API חסר. הגדר אותו בהגדרות.");
-      return;
-    }
-
     const ids = channelsToRun.map(ch => ch.id);
     setRunning(prev => { const next = new Set(prev); ids.forEach(id => next.add(id)); return next; });
 
     try {
-      const topics = await generateReportForChannels(channelsToRun, apiKey);
+      const topics = await generateReportForChannels(channelsToRun);
       const sourceNames = channelsToRun.map(ch => ch.username).join(", ");
       const { error: insertErr } = await supabase.from("digest_reports").insert({
         report_date: new Date().toISOString().split("T")[0],

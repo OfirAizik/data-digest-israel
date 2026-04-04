@@ -110,8 +110,7 @@ const DEFAULT_SOURCES = [
 ];
 
 /* ─── mock Claude summariser ──────────────────────────────── */
-async function callClaude(apiKey, sources, days) {
-  if (!apiKey || apiKey.length < 10) throw new Error("API key חסר");
+async function callClaude(sources, days) {
 
   const activeSources = sources.filter(s => s.active);
   const byCategory = {};
@@ -161,7 +160,6 @@ ${activeSources.map(s=>`- ${s.name} (${s.platform}, ${s.category})`).join("\n")}
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      apiKey,
       model: "claude-sonnet-4-6",
       max_tokens: 8000,
       messages: [{ role: "user", content: prompt }],
@@ -589,7 +587,7 @@ const ReportViewer = ({ report, onClose }) => {
 /* ─── Settings Panel ──────────────────────────────────────── */
 const DAYS_HE = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
-const SettingsPanel = ({ claudeKey, onClaudeKeyChange }) => {
+const SettingsPanel = () => {
   const [s, setS] = useState({
     messages_limit: 100,
     topics_per_category: 5,
@@ -687,17 +685,6 @@ const SettingsPanel = ({ claudeKey, onClaudeKeyChange }) => {
           fontSize: 14, fontWeight: 600, zIndex: 2000,
         }}>{toast}</div>
       )}
-
-      {/* Claude API */}
-      <div style={{ background: T.card, borderRadius: 12, padding: 20, marginBottom: 16, border: `1px solid ${T.border}` }}>
-        <h4 style={{ color: T.accentHi, margin: "0 0 16px", fontSize: 13, fontWeight: 700 }}>🤖 Claude API</h4>
-        <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>Claude API Key</label>
-        <input type="password" value={claudeKey} onChange={e => onClaudeKeyChange(e.target.value)}
-          placeholder="sk-ant-..." style={{ ...inp, fontFamily: "monospace" }} />
-        <div style={{ background: T.panel, borderRadius: 8, padding: 10, fontSize: 12, color: T.textDim, marginTop: 10 }}>
-          💡 קבל API key ב: <a href="https://console.anthropic.com" target="_blank" style={{ color: T.accentHi }}>console.anthropic.com</a>
-        </div>
-      </div>
 
       {/* Scraper */}
       <div style={{ background: T.card, borderRadius: 12, padding: 20, marginBottom: 16, border: `1px solid ${T.border}` }}>
@@ -836,9 +823,7 @@ const SettingsPanel = ({ claudeKey, onClaudeKeyChange }) => {
 export default function App() {
   const [tab, setTab]         = useState("sources");   // sources | settings
   const [sources, setSources] = useState(DEFAULT_SOURCES);
-  const [cfg, setCfg]         = useState(() => ({
-    claudeKey: typeof window !== "undefined" ? (localStorage.getItem("digest_claude_key") || "") : "",
-  }));
+  const [cfg, setCfg]         = useState({});
   const [modal, setModal]     = useState(null);        // null | "add" | source_obj
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState("");
@@ -870,9 +855,6 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, [fetchUserPerms]);
 
-  useEffect(() => {
-    localStorage.setItem("digest_claude_key", cfg.claudeKey || "");
-  }, [cfg.claudeKey]);
 
   const showToast = (msg, type = "ok") => {
     setToast({ msg, type });
@@ -909,7 +891,6 @@ export default function App() {
   };
 
   const runDigest = async () => {
-    if (!cfg.claudeKey) { showToast("❌ הכנס Claude API Key בהגדרות", "error"); setTab("settings"); return; }
     if (activeSources.length === 0) { showToast("❌ אין מקורות פעילים", "error"); return; }
 
     // Check daily run limit
@@ -931,7 +912,7 @@ export default function App() {
       await new Promise(r => setTimeout(r, 800));
 
       setProgress("שולח ל-Claude API לסיכום...");
-      const { result, usage } = await callClaude(cfg.claudeKey, sources, 2);
+      const { result, usage } = await callClaude(sources, 2);
 
       setReport(result);
       showToast("✅ דוח נוצר בהצלחה!", "ok");
@@ -1342,8 +1323,6 @@ export default function App() {
         {tab === "settings" && (
           <div style={{ maxWidth: 600 }}>
             <SettingsPanel
-              claudeKey={cfg.claudeKey}
-              onClaudeKeyChange={v => setCfg(prev => ({ ...prev, claudeKey: v }))}
             />
           </div>
         )}
