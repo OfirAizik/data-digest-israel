@@ -27,3 +27,6 @@ __pycache__/
 # Secrets
 secrets.py
 config_local.py
+
+# Generated reports
+last_report.json
