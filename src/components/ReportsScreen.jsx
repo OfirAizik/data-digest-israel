@@ -275,35 +275,44 @@ function ReportCard({ report, isOpen, onToggle, openTopics, onToggleTopic, deepT
           userSelect: "none",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <div>
-            <div style={{ color: T.text, fontSize: 14, fontWeight: 700 }}>{dateLabel}</div>
-            {createdLabel && (
-              <div style={{ color: T.textFaint, fontSize: 11, marginTop: 2 }}>נוצר: {createdLabel}</div>
-            )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ color: T.text, fontSize: 14, fontWeight: 700 }}>{dateLabel}</div>
+              {createdLabel && (
+                <div style={{ color: T.textFaint, fontSize: 11, marginTop: 2 }}>נוצר: {createdLabel}</div>
+              )}
+            </div>
+            <span style={{
+              background: T.card, border: `1px solid ${T.border}`,
+              borderRadius: 6, padding: "3px 9px", color: T.textDim, fontSize: 12, fontWeight: 600,
+              pointerEvents: "none",
+            }}>
+              {report.total_posts ?? "—"} פוסטים
+            </span>
+            <span style={{
+              background: T.card, border: `1px solid ${T.border}`,
+              borderRadius: 6, padding: "3px 9px", color: T.textFaint, fontSize: 12,
+              pointerEvents: "none",
+            }}>
+              {topics.length} נושאים
+            </span>
           </div>
-          <span style={{
-            background: T.accentHi + "18", color: T.accentHi,
-            border: `1px solid ${T.accentHi}33`,
-            borderRadius: 6, padding: "3px 10px", fontSize: 12, fontWeight: 600,
-            pointerEvents: "none",
-          }}>
-            📡 {report.source || "—"}
-          </span>
-          <span style={{
-            background: T.card, border: `1px solid ${T.border}`,
-            borderRadius: 6, padding: "3px 9px", color: T.textDim, fontSize: 12, fontWeight: 600,
-            pointerEvents: "none",
-          }}>
-            {report.total_posts ?? "—"} פוסטים
-          </span>
-          <span style={{
-            background: T.card, border: `1px solid ${T.border}`,
-            borderRadius: 6, padding: "3px 9px", color: T.textFaint, fontSize: 12,
-            pointerEvents: "none",
-          }}>
-            {topics.length} נושאים
-          </span>
+          {report.source && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {report.source.split(",").map(ch => ch.trim()).filter(Boolean).map(ch => (
+                <span key={ch} style={{
+                  background: T.accentHi + "14", color: T.accentHi,
+                  border: `1px solid ${T.accentHi}30`,
+                  borderRadius: 5, padding: "1px 7px",
+                  fontSize: 11, fontFamily: "monospace", fontWeight: 600,
+                  pointerEvents: "none",
+                }}>
+                  @{ch}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <Chevron open={isOpen} />
       </div>
@@ -384,7 +393,7 @@ ${channelList}
   return JSON.parse(raw);
 }
 
-export default function ReportsScreen() {
+export default function ReportsScreen({ runTrigger = 0 }) {
   const [reports,     setReports]    = useState([]);
   const [channels,    setChannels]   = useState([]);
   const [loading,     setLoading]    = useState(true);
@@ -397,13 +406,14 @@ export default function ReportsScreen() {
   const [runningAll,  setRunningAll] = useState(false);
 
   useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { if (runTrigger > 0) fetchAll({ runAfter: true }); }, [runTrigger]);
 
   const showToast = (msg, ms = 3000) => {
     setToast(msg);
     setTimeout(() => setToast(""), ms);
   };
 
-  const fetchAll = async () => {
+  const fetchAll = async ({ runAfter = false } = {}) => {
     setLoading(true);
     setError("");
     const [{ data: rData, error: rErr }, { data: cData, error: cErr }] = await Promise.all([
@@ -413,8 +423,12 @@ export default function ReportsScreen() {
     if (rErr) setError(`שגיאה בטעינת דוחות: ${rErr.message}`);
     if (cErr) setError(`שגיאה בטעינת ערוצים: ${cErr.message}`);
     setReports(rData || []);
-    setChannels(cData || []);
+    const loadedChannels = cData || [];
+    setChannels(loadedChannels);
     setLoading(false);
+    if (runAfter && loadedChannels.length > 0) {
+      runReport(loadedChannels);
+    }
   };
 
   const toggleReport = (id) => {

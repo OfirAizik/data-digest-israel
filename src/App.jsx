@@ -842,6 +842,7 @@ export default function App() {
   const [modal, setModal]     = useState(null);        // null | "add" | source_obj
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState("");
+  const [runTrigger, setRunTrigger] = useState(0);
   const [report, setReport]   = useState(null);        // current report
   const [filterPlatform, setFilterPlatform] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
@@ -1136,7 +1137,7 @@ export default function App() {
             {activeSources.length} מקורות פעילים
           </div>
           <button
-            onClick={() => { runDigest(); setSidebarOpen(false); }}
+            onClick={() => { setTab("reports"); setRunTrigger(t => t + 1); setSidebarOpen(false); }}
             disabled={running}
             style={{
               width: "100%", background: running ? T.muted : `linear-gradient(135deg,${T.accent},${T.accentHi})`,
@@ -1348,7 +1349,7 @@ export default function App() {
         )}
 
         {/* ── REPORTS TAB ──────────────────────────────────── */}
-        {tab === "reports" && <ReportsScreen />}
+        {tab === "reports" && <ReportsScreen runTrigger={runTrigger} />}
 
         {/* ── CHANNELS TAB ─────────────────────────────────── */}
         {tab === "channels" && <ChannelsScreen isAdmin={userPerms?.role === "admin"} />}
