@@ -102,6 +102,17 @@ function TopicRow({ topic, index, isOpen, isDeep, onToggle, onToggleDeep }) {
         }}>
           {topic.title}
         </span>
+        {topic.source_channel && (
+          <span style={{
+            background: T.muted + "22", color: T.textDim,
+            border: `1px solid ${T.muted}44`,
+            borderRadius: 5, padding: "1px 7px",
+            fontSize: 11, fontFamily: "monospace", fontWeight: 600,
+            pointerEvents: "none", flexShrink: 0,
+          }}>
+            @{topic.source_channel}
+          </span>
+        )}
         <TrendBadge trend={topic.trend} />
         <Chevron open={isOpen} />
       </div>
@@ -172,6 +183,21 @@ function TopicRow({ topic, index, isOpen, isDeep, onToggle, onToggleDeep }) {
               paddingTop: 16,
               display: "flex", flexDirection: "column", gap: 16,
             }}>
+              {/* Source channel */}
+              {topic.source_channel && (
+                <div>
+                  <SectionLabel>ערוץ מקור</SectionLabel>
+                  <span style={{
+                    background: T.muted + "22", color: T.textDim,
+                    border: `1px solid ${T.muted}44`,
+                    borderRadius: 5, padding: "2px 9px",
+                    fontSize: 12, fontFamily: "monospace", fontWeight: 600,
+                  }}>
+                    @{topic.source_channel}
+                  </span>
+                </div>
+              )}
+
               {/* Fallback for old reports without deep data */}
               {!hasDiscussion && !hasReactions && !topPostUrl && (
                 <div style={{
@@ -362,6 +388,7 @@ ${channelList}
   "summary": "סיכום קצר של 1-2 משפטים",
   "posts_count": <מספר שלם>,
   "trend": "עולה" | "יורד" | "יציב",
+  "source_channel": "שם המשתמש (username) של הערוץ שממנו מגיעים הכי הרבה פוסטים בנושא זה (לדוגמה: MDLI1)",
   "top_post_url": "https://t.me/channel/123 או null",
   "weekly_posts_count": <מספר שלם>,
   "avg_views": <מספר שלם>,
