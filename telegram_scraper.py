@@ -145,8 +145,11 @@ async def scrape_channel(client, channel, limit=100):
 
 def summarize_with_claude(messages, topics_per_category=5):
     """Returns (topics_list, usage_dict)."""
+    # Take top 60 messages by views to keep prompt size manageable
+    top_messages = sorted(messages, key=lambda m: m["views"], reverse=True)[:60]
+
     lines = []
-    for m in messages:
+    for m in top_messages:
         week_tag = "[השבוע]" if m["is_this_week"] else ""
         lines.append(
             f"[{m['channel']} | {m['date']} | views:{m['views']} "
@@ -177,7 +180,7 @@ def summarize_with_claude(messages, topics_per_category=5):
 
     payload = json.dumps({
         "model": "claude-sonnet-4-6",
-        "max_tokens": 3000,
+        "max_tokens": 8000,
         "messages": [{"role": "user", "content": prompt}],
     }).encode("utf-8")
 
@@ -198,11 +201,24 @@ def summarize_with_claude(messages, topics_per_category=5):
     usage = result.get("usage", {})
 
     raw_text = result["content"][0]["text"].strip()
+
+    # Strip markdown fences (handles ```json, ```\n, or plain ```)
     if raw_text.startswith("```"):
-        raw_text = raw_text.split("```")[1]
+        raw_text = raw_text[3:]
         if raw_text.startswith("json"):
             raw_text = raw_text[4:]
-    return json.loads(raw_text.strip()), usage
+        if raw_text.endswith("```"):
+            raw_text = raw_text[:-3]
+        raw_text = raw_text.strip()
+
+    # Safety check: detect truncated response before attempting JSON parse
+    if not raw_text.endswith("]"):
+        raise ValueError(
+            f"Claude response appears truncated (does not end with ']'). "
+            f"Last 100 chars: {raw_text[-100:]!r}"
+        )
+
+    return json.loads(raw_text), usage
 
 
 def save_to_supabase(report):
