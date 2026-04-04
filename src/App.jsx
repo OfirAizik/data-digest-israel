@@ -829,6 +829,9 @@ export default function App() {
   const [progress, setProgress] = useState("");
   const [runTrigger, setRunTrigger] = useState(0);
   const [report, setReport]   = useState(null);        // current report
+  const [reportCount, setReportCount] = useState(() => {
+    try { return parseInt(localStorage.getItem("digest_report_count") || "0", 10) || 0; } catch { return 0; }
+  });
   const [filterPlatform, setFilterPlatform] = useState("all");
   const [filterCat, setFilterCat] = useState("all");
   const [toast, setToast]       = useState(null);
@@ -855,6 +858,22 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, [fetchUserPerms]);
 
+  // Load report count from Supabase; fall back to localStorage value already in state
+  useEffect(() => {
+    (async () => {
+      try {
+        const { count } = await supabase
+          .from("digest_reports")
+          .select("*", { count: "exact", head: true });
+        if (count !== null) {
+          setReportCount(count);
+          try { localStorage.setItem("digest_report_count", String(count)); } catch {}
+        }
+      } catch {
+        // localStorage seed already applied in useState initialiser
+      }
+    })();
+  }, []);
 
   const showToast = (msg, type = "ok") => {
     setToast({ msg, type });
@@ -917,6 +936,25 @@ export default function App() {
       setReport(result);
       showToast("✅ דוח נוצר בהצלחה!", "ok");
 
+      // Save report to Supabase digest_reports
+      const totalPosts = (result.categories || []).reduce(
+        (sum, cat) => sum + (cat.posts_scanned || 0), 0
+      );
+      const { error: reportErr } = await supabase.from("digest_reports").insert({
+        report_date:          new Date().toISOString().split("T")[0],
+        source:               activeSources.map(s => s.name).join(", "),
+        total_posts:          totalPosts,
+        topics:               result,
+        active_sources_count: activeSources.length,
+      });
+      if (!reportErr) {
+        setReportCount(prev => {
+          const next = prev + 1;
+          try { localStorage.setItem("digest_report_count", String(next)); } catch {}
+          return next;
+        });
+      }
+
       // Log to Supabase
       if (user) {
         const inputTokens  = usage.input_tokens  || 0;
@@ -957,7 +995,7 @@ export default function App() {
     { label: "מקורות כולל", value: sources.length,        color: T.accentHi, icon: "db"      },
     { label: "מקורות פעילים", value: activeSources.length, color: T.green,    icon: "check"   },
     { label: "פלטפורמות",    value: platforms.length,      color: T.gold,     icon: "settings" },
-    { label: "דוחות שנוצרו", value: "—",                    color: T.orange,   icon: "report"  },
+    { label: "דוחות שנוצרו", value: reportCount,             color: T.orange,   icon: "report"  },
   ];
 
   if (authLoading) return (
