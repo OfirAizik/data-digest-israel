@@ -1,6 +1,33 @@
 import { NextResponse } from "next/server";
 
+// In-memory rate limiter: 10 requests per IP per 60-second window.
+// Each entry: { count: number, windowStart: number (ms) }
+const rateLimitMap = new Map();
+const LIMIT = 10;
+const WINDOW_MS = 60_000;
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now - entry.windowStart >= WINDOW_MS) {
+    rateLimitMap.set(ip, { count: 1, windowStart: now });
+    return false;
+  }
+  if (entry.count >= LIMIT) return true;
+  entry.count += 1;
+  return false;
+}
+
 export async function POST(request) {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    request.headers.get("x-real-ip") ??
+    "unknown";
+
+  if (isRateLimited(ip)) {
+    return NextResponse.json({ error: { message: "Too many requests" } }, { status: 429 });
+  }
+
   const { messages, model, max_tokens } = await request.json();
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
