@@ -9,6 +9,7 @@ from datetime import date, datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from telethon import TelegramClient
+from telethon.tl.functions.channels import GetFullChannelRequest
 from secrets import TELEGRAM_API_ID, TELEGRAM_API_HASH, CLAUDE_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY
 
 
@@ -437,9 +438,15 @@ async def main():
                 try:
                     entity = await client.get_entity(channel)
                     count = entity.participants_count
-                    count_str = format_members_count(count)
-                    print(f"  {channel}: {count_str} members")
-                    update_members_count(channel, count_str)
+                    if count is None:
+                        full = await client(GetFullChannelRequest(entity))
+                        count = full.full_chat.participants_count
+                    if count is not None:
+                        count_str = format_members_count(count)
+                        print(f"  {channel}: {count_str} members")
+                        update_members_count(channel, count_str)
+                    else:
+                        print(f"  {channel}: members_count unavailable, skipping")
                 except Exception as e:
                     print(f"  Warning: could not fetch members_count for {channel}: {e}")
 
