@@ -71,7 +71,7 @@ def load_config():
 
 def fetch_active_channels():
     req = urllib.request.Request(
-        f"{SUPABASE_URL}/rest/v1/telegram_channels?is_active=eq.true&select=username",
+        f"{SUPABASE_URL}/rest/v1/channels?is_active=eq.true&select=username",
         headers={
             "apikey": SUPABASE_SERVICE_KEY,
             "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
@@ -98,7 +98,7 @@ def format_members_count(count):
 def update_members_count(username, count_str):
     payload = json.dumps({"members_count": count_str}).encode("utf-8")
     req = urllib.request.Request(
-        f"{SUPABASE_URL}/rest/v1/telegram_channels?username=eq.{username}",
+        f"{SUPABASE_URL}/rest/v1/channels?username=eq.{username}",
         data=payload,
         headers={
             "apikey":        SUPABASE_SERVICE_KEY,

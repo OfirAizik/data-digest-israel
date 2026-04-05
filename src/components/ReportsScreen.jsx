@@ -444,7 +444,7 @@ export default function ReportsScreen({ runTrigger = 0 }) {
     setError("");
     const [{ data: rData, error: rErr }, { data: cData, error: cErr }] = await Promise.all([
       supabase.from("digest_reports").select("*").order("created_at", { ascending: false }),
-      supabase.from("telegram_channels").select("*").eq("is_active", true).order("name"),
+      supabase.from("channels").select("*").eq("is_active", true).order("name"),
     ]);
     if (rErr) setError(`שגיאה בטעינת דוחות: ${rErr.message}`);
     if (cErr) setError(`שגיאה בטעינת ערוצים: ${cErr.message}`);

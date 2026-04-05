@@ -77,7 +77,7 @@ export default function ChannelsScreen({ isAdmin }) {
   const fetchChannels = async () => {
     setLoading(true);
     const { data, error: err } = await supabase
-      .from("telegram_channels")
+      .from("channels")
       .select("*")
       .order("created_at", { ascending: false });
     if (err) { setError(`שגיאה: ${err.message}`); setLoading(false); return; }
@@ -89,7 +89,7 @@ export default function ChannelsScreen({ isAdmin }) {
     setSaving(id);
     setChannels(prev => prev.map(c => c.id === id ? { ...c, is_active: val } : c));
     const { error: err } = await supabase
-      .from("telegram_channels").update({ is_active: val }).eq("id", id);
+      .from("channels").update({ is_active: val }).eq("id", id);
     if (err) { setError(`שגיאת שמירה: ${err.message}`); fetchChannels(); }
     else showToast(val ? "✅ ערוץ הופעל" : "✅ ערוץ הושבת");
     setSaving(null);
@@ -98,7 +98,7 @@ export default function ChannelsScreen({ isAdmin }) {
   const addChannel = async () => {
     if (!form.name.trim() || !form.username.trim()) return;
     setSubmitting(true);
-    const { error: err } = await supabase.from("telegram_channels").insert({
+    const { error: err } = await supabase.from("channels").insert({
       name:          form.name.trim(),
       username:      form.username.trim(),
       category:      form.category.trim() || null,
@@ -121,7 +121,7 @@ export default function ChannelsScreen({ isAdmin }) {
     setSaving(id);
     setChannels(prev => prev.map(c => c.id === id ? { ...c, is_member: val } : c));
     const { error: err } = await supabase
-      .from("telegram_channels").update({ is_member: val }).eq("id", id);
+      .from("channels").update({ is_member: val }).eq("id", id);
     if (err) { setError(`שגיאת שמירה: ${err.message}`); fetchChannels(); }
     else showToast(val ? "✅ סומן כחבר" : "✅ סומן כלא חבר");
     setSaving(null);
@@ -135,7 +135,7 @@ export default function ChannelsScreen({ isAdmin }) {
   const saveEdit = async () => {
     setSaving(editId);
     const { error: err } = await supabase
-      .from("telegram_channels")
+      .from("channels")
       .update({ name: editForm.name.trim(), category: editForm.category.trim() || null, members_count: editForm.members_count.trim() || null, notes: editForm.notes.trim() || null })
       .eq("id", editId);
     if (err) setError(`שגיאת עדכון: ${err.message}`);
@@ -146,7 +146,7 @@ export default function ChannelsScreen({ isAdmin }) {
 
   const confirmDelete = async () => {
     const { error: err } = await supabase
-      .from("telegram_channels").delete().eq("id", deleteId);
+      .from("channels").delete().eq("id", deleteId);
     if (err) setError(`שגיאת מחיקה: ${err.message}`);
     else { showToast("✅ ערוץ נמחק"); fetchChannels(); }
     setDeleteId(null);
