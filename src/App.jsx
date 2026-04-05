@@ -932,8 +932,17 @@ export default function App() {
     showToast("🗑️ מקור הוסר", "warn");
   };
 
-  const handleToggle = (id) => {
-    setSources(prev => prev.map(s => s.id === id ? { ...s, active: !s.active } : s));
+  const handleToggle = async (id) => {
+    setSources(prev => {
+      const next = prev.map(s => s.id === id ? { ...s, active: !s.active } : s);
+      const updated = next.find(s => s.id === id);
+      if (updated) {
+        supabase.from("channels").update({ is_active: updated.active }).eq("id", id).then(({ error }) => {
+          if (error) console.error("Failed to update is_active:", error.message);
+        });
+      }
+      return next;
+    });
   };
 
   const runDigest = async () => {
