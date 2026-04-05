@@ -858,6 +858,33 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, [fetchUserPerms]);
 
+  // Load channels from Supabase; fall back to DEFAULT_SOURCES on error
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("channels")
+          .select("id, name, username, platform, category, is_active, is_member, notes");
+        if (error) throw error;
+        if (data && data.length > 0) {
+          const mapped = data.map(ch => ({
+            id:       ch.id,
+            platform: ch.platform || "telegram",
+            name:     ch.name,
+            category: ch.category || "כללי",
+            url:      ch.username,
+            active:   ch.is_active ?? true,
+            members:  ch.members_count || "N/A",
+            activity: 3,
+          }));
+          setSources(mapped);
+        }
+      } catch {
+        // keep DEFAULT_SOURCES already in state
+      }
+    })();
+  }, []);
+
   // Load report count from Supabase; fall back to localStorage value already in state
   useEffect(() => {
     (async () => {
