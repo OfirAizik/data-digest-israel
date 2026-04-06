@@ -192,10 +192,18 @@ def main():
     cfg = fetch_app_config()
 
     mode          = cfg.get("schedule_mode", "interval").strip()
-    run_time      = cfg.get("run_time", "08:00").strip()
     interval_days = int(cfg.get("interval_days", "1"))
     specific_days  = cfg.get("specific_days", "")
     specific_dates = cfg.get("specific_dates", "")
+
+    # Build run_time from schedule_hour + schedule_minute if present,
+    # otherwise fall back to run_time key, then default 08:00.
+    if "schedule_hour" in cfg or "schedule_minute" in cfg:
+        _hour   = int(cfg.get("schedule_hour",   "8"))
+        _minute = int(cfg.get("schedule_minute", "0"))
+        run_time = f"{_hour:02d}:{_minute:02d}"
+    else:
+        run_time = cfg.get("run_time", "08:00").strip()
 
     print(f"  schedule_mode   = {mode}")
     print(f"  run_time        = {run_time}")

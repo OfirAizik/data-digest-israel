@@ -596,6 +596,8 @@ const SettingsPanel = () => {
     specific_days: [],
     specific_dates: [],
     run_time: "08:00",
+    schedule_hour: 8,
+    schedule_minute: 0,
     gmail_user: "",
     gmail_pass: "",
     recipients: "",
@@ -617,7 +619,9 @@ const SettingsPanel = () => {
           interval_days:       map.interval_days       ? +map.interval_days       : prev.interval_days,
           specific_days:       map.specific_days       ? JSON.parse(map.specific_days)  : prev.specific_days,
           specific_dates:      map.specific_dates      ? JSON.parse(map.specific_dates) : prev.specific_dates,
-          run_time:            map.run_time            || prev.run_time,
+          run_time:        map.run_time        || prev.run_time,
+          schedule_hour:   map.schedule_hour   != null ? +map.schedule_hour   : (map.run_time ? +map.run_time.split(":")[0] : prev.schedule_hour),
+          schedule_minute: map.schedule_minute != null ? +map.schedule_minute : (map.run_time ? +map.run_time.split(":")[1] : prev.schedule_minute),
           gmail_user:          map.gmail_user          || prev.gmail_user,
           gmail_pass:          map.gmail_pass          || prev.gmail_pass,
           recipients:          map.recipients          || prev.recipients,
@@ -653,7 +657,9 @@ const SettingsPanel = () => {
       { key: "interval_days",       value: String(s.interval_days) },
       { key: "specific_days",       value: JSON.stringify(s.specific_days) },
       { key: "specific_dates",      value: JSON.stringify(s.specific_dates) },
-      { key: "run_time",            value: s.run_time },
+      { key: "run_time",        value: `${String(s.schedule_hour).padStart(2,"0")}:${String(s.schedule_minute).padStart(2,"0")}` },
+      { key: "schedule_hour",   value: String(s.schedule_hour) },
+      { key: "schedule_minute", value: String(s.schedule_minute) },
       { key: "gmail_user",          value: s.gmail_user },
       { key: "gmail_pass",          value: s.gmail_pass },
       { key: "recipients",          value: s.recipients },
@@ -778,8 +784,18 @@ const SettingsPanel = () => {
 
         <div>
           <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>שעת הרצה</label>
-          <input type="time" value={s.run_time} onChange={e => set("run_time", e.target.value)}
-            style={{ ...inp, width: "auto", colorScheme: "dark" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input type="number" min={0} max={23} value={s.schedule_hour}
+              onChange={e => set("schedule_hour", Math.min(23, Math.max(0, +e.target.value)))}
+              style={{ ...inp, width: 70, textAlign: "center" }} />
+            <span style={{ color: T.textDim, fontWeight: 700, fontSize: 16 }}>:</span>
+            <input type="number" min={0} max={59} value={s.schedule_minute}
+              onChange={e => set("schedule_minute", Math.min(59, Math.max(0, +e.target.value)))}
+              style={{ ...inp, width: 70, textAlign: "center" }} />
+            <span style={{ color: T.textDim, fontSize: 12 }}>
+              ({String(s.schedule_hour).padStart(2,"0")}:{String(s.schedule_minute).padStart(2,"0")})
+            </span>
+          </div>
         </div>
       </div>
 

@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import subprocess
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone, date
@@ -188,7 +189,25 @@ def call_claude(prompt, max_tokens):
             raw_text = raw_text[:-3]
         raw_text = raw_text.strip()
 
-    return json.loads(raw_text), usage
+    try:
+        return json.loads(raw_text), usage
+    except json.JSONDecodeError:
+        # Try to extract the outermost JSON object or array
+        try:
+            start = raw_text.index('{')
+            end   = raw_text.rindex('}') + 1
+            return json.loads(raw_text[start:end]), usage
+        except (ValueError, json.JSONDecodeError):
+            pass
+        try:
+            start = raw_text.index('[')
+            end   = raw_text.rindex(']') + 1
+            return json.loads(raw_text[start:end]), usage
+        except (ValueError, json.JSONDecodeError):
+            raise ValueError(
+                f"Could not parse JSON from Claude response. "
+                f"Last 200 chars: {raw_text[-200:]!r}"
+            )
 
 
 # ── Two-phase summarization ───────────────────────────────────────────────────
@@ -328,6 +347,7 @@ def summarize_with_claude(posts_by_group, groups):
 
 def main():
     started_at   = datetime.now(timezone.utc).isoformat()
+    start_time   = time.time()
     total_tokens = 0
     cost_usd     = 0.0
     channels     = []
@@ -366,9 +386,13 @@ def main():
                 print(f"  [{t.get('frequency_score', '?')}] {t.get('title', '')} "
                       f"({t.get('engagement_level', '')})")
 
-        print("\nDone.")
+        runtime = int(time.time() - start_time)
+        print(f"\n⏱️ Total runtime: {runtime // 60}m {runtime % 60}s")
+        print("Done.")
 
     except Exception as e:
+        runtime = int(time.time() - start_time)
+        print(f"⏱️ Total runtime: {runtime // 60}m {runtime % 60}s")
         print(f"Fatal error: {e}")
         raise
 
