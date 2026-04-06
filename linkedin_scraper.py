@@ -303,46 +303,6 @@ def phase2_global_ranking(all_extracted_topics, total_posts, total_groups):
     return report, usage
 
 
-def summarize_with_claude(posts_by_group, groups):
-    """
-    Two-phase summarization.
-    posts_by_group: flat list of {group, text} dicts
-    groups: list of group name strings (for metadata)
-    Returns (final_report_dict, total_usage_dict)
-    """
-    # ── Phase 1: batch extraction ────────────────────────────────────────────
-    # Group posts by their group name for batching
-    group_names = list(dict.fromkeys(p["group"] for p in posts_by_group))
-    batches = [group_names[i:i + BATCH_SIZE]
-               for i in range(0, len(group_names), BATCH_SIZE)]
-
-    all_extracted = []
-    total_usage   = {"input_tokens": 0, "output_tokens": 0}
-
-    for idx, batch_groups in enumerate(batches, 1):
-        batch_posts = [p for p in posts_by_group if p["group"] in batch_groups]
-        if not batch_posts:
-            continue
-        topics, usage = phase1_extract_batch(batch_posts, idx)
-        all_extracted.extend(topics)
-        total_usage["input_tokens"]  += usage.get("input_tokens", 0)
-        total_usage["output_tokens"] += usage.get("output_tokens", 0)
-
-    print(f"\nPhase 1 complete: {len(all_extracted)} raw topics from "
-          f"{len(batches)} batch(es).")
-
-    # ── Phase 2: global ranking ──────────────────────────────────────────────
-    final_report, usage = phase2_global_ranking(
-        all_extracted,
-        total_posts=len(posts_by_group),
-        total_groups=len(group_names),
-    )
-    total_usage["input_tokens"]  += usage.get("input_tokens", 0)
-    total_usage["output_tokens"] += usage.get("output_tokens", 0)
-
-    return final_report, total_usage
-
-
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():
@@ -365,10 +325,37 @@ def main():
             print("No posts collected. Exiting.")
             return
 
-        report, usage = summarize_with_claude(posts, [ch["name"] for ch in channels])
+        # ── Phase 1: extract topics per batch ────────────────────────────────
+        group_names = list(dict.fromkeys(p["group"] for p in posts))
+        batches     = [group_names[i:i + BATCH_SIZE]
+                       for i in range(0, len(group_names), BATCH_SIZE)]
 
-        input_tokens  = usage.get("input_tokens", 0)
-        output_tokens = usage.get("output_tokens", 0)
+        all_raw_topics = []
+        total_usage    = {"input_tokens": 0, "output_tokens": 0}
+
+        for idx, batch_groups in enumerate(batches, 1):
+            batch_posts = [p for p in posts if p["group"] in batch_groups]
+            if not batch_posts:
+                continue
+            topics, usage = phase1_extract_batch(batch_posts, idx)
+            all_raw_topics.extend(topics)
+            total_usage["input_tokens"]  += usage.get("input_tokens", 0)
+            total_usage["output_tokens"] += usage.get("output_tokens", 0)
+
+        print(f"\nPhase 1 complete: {len(all_raw_topics)} raw topics "
+              f"from {len(batches)} batch(es).")
+
+        # ── Phase 2: global ranking ───────────────────────────────────────────
+        report, usage = phase2_global_ranking(
+            all_raw_topics,
+            total_posts=len(posts),
+            total_groups=len(group_names),
+        )
+        total_usage["input_tokens"]  += usage.get("input_tokens", 0)
+        total_usage["output_tokens"] += usage.get("output_tokens", 0)
+
+        input_tokens  = total_usage["input_tokens"]
+        output_tokens = total_usage["output_tokens"]
         total_tokens  = input_tokens + output_tokens
         # claude-sonnet-4-6: $3/MTok input, $15/MTok output
         cost_usd = round((input_tokens * 3 + output_tokens * 15) / 1_000_000, 6)
