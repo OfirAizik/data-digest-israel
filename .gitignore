@@ -30,3 +30,4 @@ config_local.py
 
 # Generated reports
 last_report.json
+linkedin_session.json

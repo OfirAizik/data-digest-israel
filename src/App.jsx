@@ -1,10 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import LoginScreen from "./components/LoginScreen";
-import LogsScreen from "./components/LogsScreen";
-import UsersScreen from "./components/UsersScreen";
 import ChannelsScreen from "./components/ChannelsScreen";
 import ReportsScreen from "./components/ReportsScreen";
 
@@ -110,7 +107,7 @@ const DEFAULT_SOURCES = [
 ];
 
 /* ─── mock Claude summariser ──────────────────────────────── */
-async function callClaude(sources, days) {
+async function callClaude(sources, days, apiKey) {
 
   const activeSources = sources.filter(s => s.active);
   const byCategory = {};
@@ -163,6 +160,7 @@ ${activeSources.map(s=>`- ${s.name} (${s.platform}, ${s.category})`).join("\n")}
       model: "claude-sonnet-4-6",
       max_tokens: 8000,
       messages: [{ role: "user", content: prompt }],
+      apiKey,
     }),
   });
 
@@ -588,6 +586,9 @@ const ReportViewer = ({ report, onClose }) => {
 const DAYS_HE = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
 const SettingsPanel = () => {
+  const [claudeKey, setClaudeKey] = useState(() => {
+    try { return localStorage.getItem("claude_api_key") || ""; } catch { return ""; }
+  });
   const [s, setS] = useState({
     messages_limit: 100,
     topics_per_category: 5,
@@ -645,6 +646,7 @@ const SettingsPanel = () => {
   const removeDate = (d) => set("specific_dates", s.specific_dates.filter(x => x !== d));
 
   const save = async () => {
+    try { localStorage.setItem("claude_api_key", claudeKey); } catch {}
     setSaving(true);
     const rows = [
       { key: "messages_limit",      value: String(s.messages_limit) },
@@ -685,6 +687,24 @@ const SettingsPanel = () => {
           fontSize: 14, fontWeight: 600, zIndex: 2000,
         }}>{toast}</div>
       )}
+
+      {/* Claude API Key */}
+      <div style={{ background: T.card, borderRadius: 12, padding: 20, marginBottom: 16, border: `1px solid ${T.border}` }}>
+        <h4 style={{ color: T.accentHi, margin: "0 0 16px", fontSize: 13, fontWeight: 700 }}>🔑 מפתח Claude API</h4>
+        <div>
+          <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>Anthropic API Key</label>
+          <input
+            type="password"
+            value={claudeKey}
+            onChange={e => setClaudeKey(e.target.value)}
+            placeholder="sk-ant-..."
+            style={{ ...inp, fontFamily: "monospace", direction: "ltr" }}
+          />
+          <div style={{ color: T.textFaint, fontSize: 11, marginTop: 6 }}>
+            המפתח נשמר מקומית בדפדפן בלבד ואינו נשלח לשרת.
+          </div>
+        </div>
+      </div>
 
       {/* Scraper */}
       <div style={{ background: T.card, borderRadius: 12, padding: 20, marginBottom: 16, border: `1px solid ${T.border}` }}>
@@ -836,27 +856,9 @@ export default function App() {
   const [filterCat, setFilterCat] = useState("all");
   const [toast, setToast]       = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [user, setUser]           = useState(null);
-  const [userPerms, setUserPerms] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-
-  const fetchUserPerms = useCallback(async (userId) => {
-    const { data } = await supabase.from("user_permissions").select("*").eq("user_id", userId).single();
-    setUserPerms(data || null);
-    setAuthLoading(false);
-  }, []);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) { setUser(session.user); fetchUserPerms(session.user.id); }
-      else setAuthLoading(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) { setUser(session.user); fetchUserPerms(session.user.id); }
-      else { setUser(null); setUserPerms(null); setAuthLoading(false); }
-    });
-    return () => subscription.unsubscribe();
-  }, [fetchUserPerms]);
+  const [claudeApiKey] = useState(() => {
+    try { return localStorage.getItem("claude_api_key") || ""; } catch { return ""; }
+  });
 
   // Load channels from Supabase; fall back to DEFAULT_SOURCES on error
   useEffect(() => {
@@ -938,18 +940,8 @@ export default function App() {
 
   const runDigest = async () => {
     if (activeSources.length === 0) { showToast("❌ אין מקורות פעילים", "error"); return; }
+    if (!claudeApiKey) { showToast("❌ נא להגדיר מפתח Claude API בהגדרות", "error"); return; }
 
-    // Check daily run limit
-    if (userPerms) {
-      const today = new Date().toISOString().slice(0, 10);
-      const runsToday = userPerms.last_run_date === today ? (userPerms.runs_today || 0) : 0;
-      if (runsToday >= (userPerms.daily_run_limit ?? 3)) {
-        showToast(`❌ הגעת למגבלת ${userPerms.daily_run_limit} ריצות היום`, "error");
-        return;
-      }
-    }
-
-    const startedAt = new Date().toISOString();
     setRunning(true);
     setProgress("מאתחל סריקה...");
 
@@ -958,7 +950,7 @@ export default function App() {
       await new Promise(r => setTimeout(r, 800));
 
       setProgress("שולח ל-Claude API לסיכום...");
-      const { result, usage } = await callClaude(sources, 2);
+      const { result } = await callClaude(sources, 2, claudeApiKey);
 
       setReport(result);
       showToast("✅ דוח נוצר בהצלחה!", "ok");
@@ -981,36 +973,8 @@ export default function App() {
           return next;
         });
       }
-
-      // Log to Supabase
-      if (user) {
-        const inputTokens  = usage.input_tokens  || 0;
-        const outputTokens = usage.output_tokens || 0;
-        const costUsd      = inputTokens * 0.000003 + outputTokens * 0.000015;
-        await supabase.from("run_logs").insert({
-          user_id: user.id, user_email: user.email,
-          started_at: startedAt, finished_at: new Date().toISOString(),
-          status: "success", sources_scanned: activeSources.length,
-          input_tokens: inputTokens, output_tokens: outputTokens,
-          total_tokens: inputTokens + outputTokens, cost_usd: costUsd,
-          report_summary: `${(result.categories || []).length} קטגוריות`,
-        });
-        // Update runs_today counter
-        const today = new Date().toISOString().slice(0, 10);
-        const runsToday = userPerms?.last_run_date === today ? (userPerms.runs_today || 0) : 0;
-        await supabase.from("user_permissions").update({ runs_today: runsToday + 1, last_run_date: today }).eq("user_id", user.id);
-        setUserPerms(prev => prev ? { ...prev, runs_today: runsToday + 1, last_run_date: today } : prev);
-      }
     } catch (e) {
       showToast(`❌ שגיאה: ${e.message}`, "error");
-      if (user) {
-        await supabase.from("run_logs").insert({
-          user_id: user.id, user_email: user.email,
-          started_at: startedAt, finished_at: new Date().toISOString(),
-          status: "error", sources_scanned: activeSources.length,
-          error_message: e.message,
-        });
-      }
     } finally {
       setRunning(false);
       setProgress("");
@@ -1025,22 +989,12 @@ export default function App() {
     { label: "דוחות שנוצרו", value: reportCount,             color: T.orange,   icon: "report"  },
   ];
 
-  if (authLoading) return (
-    <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", color: T.textDim, fontFamily: "'Segoe UI', Tahoma, Arial, sans-serif" }}>
-      טוען...
-    </div>
-  );
-
-  if (!user) return <LoginScreen onLogin={(u) => { setUser(u); fetchUserPerms(u.id); }} />;
-
   const navItems = [
-    { id: "sources",   label: "מקורות",  icon: "db",        show: userPerms?.can_access_sources  !== false },
-    { id: "reports",   label: "דוחות",   icon: "report",    show: userPerms?.can_access_sources  !== false },
-    { id: "channels",  label: "ערוצים",  icon: "broadcast", show: userPerms?.can_access_sources  !== false },
-    { id: "settings",  label: "הגדרות",  icon: "settings",  show: userPerms?.can_access_settings !== false },
-    { id: "logs",     label: "לוגים",    icon: "report",   show: !!userPerms?.can_access_logs   },
-    { id: "users",    label: "משתמשים",  icon: "toggle",   show: userPerms?.role === "admin"    },
-  ].filter(item => item.show);
+    { id: "sources",  label: "מקורות", icon: "db"        },
+    { id: "reports",  label: "דוחות",  icon: "report"    },
+    { id: "channels", label: "ערוצים", icon: "broadcast" },
+    { id: "settings", label: "הגדרות", icon: "settings"  },
+  ];
 
   return (
     <div style={{
@@ -1153,26 +1107,6 @@ export default function App() {
             </button>
           ))}
         </nav>
-
-        {/* User info + logout */}
-        <div style={{ padding: "12px 14px", borderTop: `1px solid ${T.border}` }}>
-          <div style={{ color: T.textFaint, fontSize: 11, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {user.email}
-          </div>
-          {userPerms?.role === "admin" && (
-            <div style={{ color: T.gold, fontSize: 10, marginBottom: 8 }}>👑 מנהל</div>
-          )}
-          <button
-            onClick={async () => { await supabase.auth.signOut(); }}
-            style={{
-              width: "100%", background: "none", border: `1px solid ${T.border}`,
-              color: T.textDim, borderRadius: 8, padding: "7px 0",
-              cursor: "pointer", fontSize: 12,
-            }}
-          >
-            יציאה
-          </button>
-        </div>
 
         {/* Run button */}
         <div style={{ padding: "16px 12px", borderTop: `1px solid ${T.border}` }}>
@@ -1396,13 +1330,7 @@ export default function App() {
         {tab === "reports" && <ReportsScreen runTrigger={runTrigger} />}
 
         {/* ── CHANNELS TAB ─────────────────────────────────── */}
-        {tab === "channels" && <ChannelsScreen isAdmin={userPerms?.role === "admin"} />}
-
-        {/* ── LOGS TAB ─────────────────────────────────────── */}
-        {tab === "logs" && <LogsScreen />}
-
-        {/* ── USERS TAB ────────────────────────────────────── */}
-        {tab === "users" && <UsersScreen />}
+        {tab === "channels" && <ChannelsScreen isAdmin={true} />}
 
         {/* ── HISTORY TAB ──────────────────────────────────── */}
       </div>

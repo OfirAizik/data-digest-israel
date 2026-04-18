@@ -4,7 +4,12 @@
       "Bash(npm install:*)",
       "Bash(cd:*)",
       "Bash(npx next:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(python project_audit.py)",
+      "Bash(python run_setup_sql.py)",
+      "Bash(python -)",
+      "Bash(npm list:*)",
+      "Bash(python migrate_channels.py)"
     ]
   }
 }

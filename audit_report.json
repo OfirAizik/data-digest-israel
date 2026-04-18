@@ -1,0 +1,70 @@
+{
+  "generated_at": "2026-04-04T08:11:59.667027+00:00",
+  "summary": {
+    "PASS": 12,
+    "WARN": 0,
+    "FAIL": 0
+  },
+  "checks": [
+    {
+      "label": "app/api/claude/route.js exists",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "label": "route.js uses process.env.ANTHROPIC_API_KEY",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "label": "route.js does NOT read apiKey from request body",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "label": "src/App.jsx fetch body has no apiKey",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "label": "src/App.jsx does NOT save API key to localStorage",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "label": "DataDigestApp.jsx does NOT exist in root",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "label": "api/claude.js does NOT exist",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "label": ".gitignore contains 'secrets.py'",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "label": ".gitignore contains '*.session'",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "label": ".gitignore contains '.env'",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "label": ".gitignore contains '.next'",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "label": "last_report.json is in .gitignore",
+      "status": "PASS",
+      "detail": ""
+    }
+  ]
+}
