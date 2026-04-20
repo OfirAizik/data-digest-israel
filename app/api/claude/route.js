@@ -28,11 +28,11 @@ export async function POST(request) {
     return NextResponse.json({ error: { message: "Too many requests" } }, { status: 429 });
   }
 
-  const { messages, model, max_tokens, apiKey: bodyKey } = await request.json();
-  const apiKey = bodyKey || process.env.ANTHROPIC_API_KEY;
+  const { messages, model, max_tokens } = await request.json();
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    return NextResponse.json({ error: { message: "נא להגדיר מפתח Claude API בהגדרות" } }, { status: 400 });
+    return NextResponse.json({ error: { message: "ANTHROPIC_API_KEY is not configured" } }, { status: 500 });
   }
 
   const resp = await fetch("https://api.anthropic.com/v1/messages", {

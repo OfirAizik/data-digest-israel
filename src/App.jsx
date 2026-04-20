@@ -107,7 +107,7 @@ const DEFAULT_SOURCES = [
 ];
 
 /* ─── mock Claude summariser ──────────────────────────────── */
-async function callClaude(sources, days, apiKey) {
+async function callClaude(sources, days) {
 
   const activeSources = sources.filter(s => s.active);
   const byCategory = {};
@@ -160,7 +160,6 @@ ${activeSources.map(s=>`- ${s.name} (${s.platform}, ${s.category})`).join("\n")}
       model: "claude-sonnet-4-6",
       max_tokens: 8000,
       messages: [{ role: "user", content: prompt }],
-      apiKey,
     }),
   });
 
@@ -586,9 +585,6 @@ const ReportViewer = ({ report, onClose }) => {
 const DAYS_HE = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
 const SettingsPanel = () => {
-  const [claudeKey, setClaudeKey] = useState(() => {
-    try { return localStorage.getItem("claude_api_key") || ""; } catch { return ""; }
-  });
   const [s, setS] = useState({
     messages_limit: 100,
     topics_per_category: 5,
@@ -646,7 +642,6 @@ const SettingsPanel = () => {
   const removeDate = (d) => set("specific_dates", s.specific_dates.filter(x => x !== d));
 
   const save = async () => {
-    try { localStorage.setItem("claude_api_key", claudeKey); } catch {}
     setSaving(true);
     const rows = [
       { key: "messages_limit",      value: String(s.messages_limit) },
@@ -687,24 +682,6 @@ const SettingsPanel = () => {
           fontSize: 14, fontWeight: 600, zIndex: 2000,
         }}>{toast}</div>
       )}
-
-      {/* Claude API Key */}
-      <div style={{ background: T.card, borderRadius: 12, padding: 20, marginBottom: 16, border: `1px solid ${T.border}` }}>
-        <h4 style={{ color: T.accentHi, margin: "0 0 16px", fontSize: 13, fontWeight: 700 }}>🔑 מפתח Claude API</h4>
-        <div>
-          <label style={{ color: T.textDim, fontSize: 12, display: "block", marginBottom: 5 }}>Anthropic API Key</label>
-          <input
-            type="password"
-            value={claudeKey}
-            onChange={e => setClaudeKey(e.target.value)}
-            placeholder="sk-ant-..."
-            style={{ ...inp, fontFamily: "monospace", direction: "ltr" }}
-          />
-          <div style={{ color: T.textFaint, fontSize: 11, marginTop: 6 }}>
-            המפתח נשמר מקומית בדפדפן בלבד ואינו נשלח לשרת.
-          </div>
-        </div>
-      </div>
 
       {/* Scraper */}
       <div style={{ background: T.card, borderRadius: 12, padding: 20, marginBottom: 16, border: `1px solid ${T.border}` }}>
@@ -856,9 +833,6 @@ export default function App() {
   const [filterCat, setFilterCat] = useState("all");
   const [toast, setToast]       = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [claudeApiKey] = useState(() => {
-    try { return localStorage.getItem("claude_api_key") || ""; } catch { return ""; }
-  });
 
   // Load channels from Supabase; fall back to DEFAULT_SOURCES on error
   useEffect(() => {
@@ -940,7 +914,6 @@ export default function App() {
 
   const runDigest = async () => {
     if (activeSources.length === 0) { showToast("❌ אין מקורות פעילים", "error"); return; }
-    if (!claudeApiKey) { showToast("❌ נא להגדיר מפתח Claude API בהגדרות", "error"); return; }
 
     setRunning(true);
     setProgress("מאתחל סריקה...");
@@ -950,7 +923,7 @@ export default function App() {
       await new Promise(r => setTimeout(r, 800));
 
       setProgress("שולח ל-Claude API לסיכום...");
-      const { result } = await callClaude(sources, 2, claudeApiKey);
+      const { result } = await callClaude(sources, 2);
 
       setReport(result);
       showToast("✅ דוח נוצר בהצלחה!", "ok");
